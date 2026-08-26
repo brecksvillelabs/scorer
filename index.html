@@ -9,6 +9,7 @@
   <link rel="icon" href="./assets/app-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./v035.css">
+  <link rel="stylesheet" href="./v036.css">
 </head>
 <body>
   <div class="app-shell" id="appShell">
@@ -21,7 +22,7 @@
         <button id="undoBtn" class="icon-btn" type="button" aria-label="Undo">↶</button>
         <button id="swapBtn" class="icon-btn" type="button" aria-label="Swap sides">⇄</button>
         <button id="editBtn" class="icon-btn" type="button" aria-label="Game setup">⚙</button>
-        <button id="journalBtn" class="icon-btn" type="button" aria-label="Game journal">📷</button>
+        <button id="journalBtn" class="icon-btn" type="button" aria-label="Game diary">📖</button>
         <button id="displayBtn" class="display-btn" type="button">Display</button>
       </div>
     </header>
@@ -89,18 +90,23 @@
   <div class="modal-backdrop hidden" id="journalModal" aria-hidden="true">
     <div class="setup-modal journal-modal" role="dialog" aria-modal="true" aria-labelledby="journalTitle">
       <div class="modal-header">
-        <div><div class="eyebrow">GAME JOURNAL</div><h2 id="journalTitle">Match album</h2></div>
-        <button id="closeJournalBtn" class="icon-btn" type="button" aria-label="Close journal">✕</button>
+        <div><div class="eyebrow">GAME DIARY</div><h2 id="journalTitle">Game story</h2></div>
+        <button id="closeJournalBtn" class="icon-btn" type="button" aria-label="Close game diary">✕</button>
       </div>
       <div class="journal-layout">
         <section class="journal-main">
           <div id="journalMatchCard" class="journal-match-card"></div>
-          <div id="capturePanel" class="capture-panel">
-            <label>Optional note<input id="photoCaption" maxlength="180" placeholder="Warm-up, match point, celebration…"></label>
-            <label class="camera-btn">📷 Add photo<input id="photoInput" type="file" accept="image/*" capture="environment"></label>
-            <button id="archiveMatchBtn" class="secondary-btn" type="button">Save match to history</button>
+          <div id="diarySummary" class="diary-summary"></div>
+          <div id="capturePanel" class="capture-panel diary-composer">
+            <label class="diary-note-field">Quick note<input id="photoCaption" maxlength="500" placeholder="Huge save, great rally, first goal, celebration…"></label>
+            <label class="highlight-toggle"><input id="momentHighlight" type="checkbox"> <span>⭐ Highlight this moment</span></label>
+            <div class="diary-composer-actions">
+              <label class="camera-btn">📷 Add photo<input id="photoInput" type="file" accept="image/*" capture="environment"></label>
+              <button id="saveNoteBtn" class="secondary-btn diary-note-btn" type="button">📝 Save note</button>
+              <button id="archiveMatchBtn" class="secondary-btn" type="button">Save match</button>
+            </div>
           </div>
-          <div id="albumGrid" class="album-grid"></div>
+          <div id="albumGrid" class="album-grid diary-timeline"></div>
         </section>
         <aside class="history-panel">
           <div class="section-label">Match history</div>

@@ -3,6 +3,11 @@ import {
   createTeamProfile, upsertTeamProfile, profilesForSport, removeTeamProfile,
   hasMatchActivity, matchContext, matchSummary, addMatchPhoto, listMatchPhotos, deleteMatchPhoto
 } from './journal.js';
+import {
+  addMatchNote, listMatchNotes, deleteMatchNote, setMatchNoteHighlighted,
+  getPhotoHighlights, setPhotoHighlighted, cleanupDiary
+} from './diary.js';
+import { mergeDiaryItems, diaryContextText, diaryMomentSummary } from './v036-core.js';
 
 const STATE_KEY = 'scorer-state-v2';
 const FAVORITES_KEY = 'scorer-favorite-teams-v1';
@@ -24,13 +29,14 @@ const el = {
   inputRosterA: $('inputRosterA'), inputRosterB: $('inputRosterB'), logoPreviewA: $('logoPreviewA'), logoPreviewB: $('logoPreviewB'),
   favoriteSelectA: $('favoriteSelectA'), favoriteSelectB: $('favoriteSelectB'), saveFavoriteA: $('saveFavoriteA'), saveFavoriteB: $('saveFavoriteB'), deleteFavoriteA: $('deleteFavoriteA'), deleteFavoriteB: $('deleteFavoriteB'),
   startGameBtn: $('startGameBtn'), resetSavedBtn: $('resetSavedBtn'),
-  journalBtn: $('journalBtn'), journalModal: $('journalModal'), closeJournalBtn: $('closeJournalBtn'), journalMatchCard: $('journalMatchCard'), capturePanel: $('capturePanel'),
-  photoCaption: $('photoCaption'), photoInput: $('photoInput'), archiveMatchBtn: $('archiveMatchBtn'), albumGrid: $('albumGrid'), historyList: $('historyList'), toast: $('toast')
+  journalBtn: $('journalBtn'), journalModal: $('journalModal'), closeJournalBtn: $('closeJournalBtn'), journalMatchCard: $('journalMatchCard'), capturePanel: $('capturePanel'), diarySummary: $('diarySummary'),
+  photoCaption: $('photoCaption'), photoInput: $('photoInput'), saveNoteBtn: $('saveNoteBtn'), momentHighlight: $('momentHighlight'), archiveMatchBtn: $('archiveMatchBtn'), albumGrid: $('albumGrid'), historyList: $('historyList'), toast: $('toast')
 };
 
 bind();
 renderFavoriteSelects();
 ensureCurrentMatchId();
+cleanupDiary([normalizedState()?.matchId, ...history.map(item => item.matchId)]);
 setInterval(syncCompletedMatch, 1200);
 
 function bind() {
@@ -71,7 +77,8 @@ function bind() {
     if (state) { archiveState(state, true); renderJournal(); }
   });
   el.photoInput.addEventListener('change', capturePhoto);
-  el.albumGrid.addEventListener('click', deletePhotoFromAlbum);
+  el.saveNoteBtn.addEventListener('click', saveQuickNote);
+  el.albumGrid.addEventListener('click', handleDiaryAction);
   el.historyList.addEventListener('click', event => {
     const button = event.target.closest('[data-history-match]');
     if (!button) return;
@@ -245,9 +252,10 @@ async function renderJournal() {
   const current = state && viewingMatchId === state.matchId;
   const summary = current ? matchSummary(state) : history.find(x => x.matchId === viewingMatchId);
   if (!summary) {
-    el.journalMatchCard.innerHTML = '<div class="history-empty">Start a match to create a game journal.</div>';
+    el.journalMatchCard.innerHTML = '<div class="history-empty">Start a match to create a game diary.</div>';
     el.capturePanel.classList.add('hidden');
-    el.albumGrid.innerHTML = '<div class="album-empty">No match album yet.</div>';
+    el.diarySummary.innerHTML = '';
+    el.albumGrid.innerHTML = '<div class="album-empty">No game diary yet.</div>';
     renderHistoryList('');
     return;
   }
@@ -256,21 +264,44 @@ async function renderJournal() {
   revokeUrls();
   let photos = [];
   try { photos = await listMatchPhotos(summary.matchId); } catch {}
-  el.albumGrid.innerHTML = photos.length ? photos.map(photoCard).join('') : '<div class="album-empty">No photos yet. Add a sideline photo and Scorer will preserve the live score context with it.</div>';
+  const notes = listMatchNotes(summary.matchId);
+  const items = mergeDiaryItems(photos, notes, getPhotoHighlights());
+  const counts = diaryMomentSummary(items);
+  el.diarySummary.innerHTML = `<div><strong>${counts.photos}</strong> photo${counts.photos === 1 ? '' : 's'} · <strong>${counts.notes}</strong> note${counts.notes === 1 ? '' : 's'}${counts.highlights ? ` · <strong>${counts.highlights}</strong> highlight${counts.highlights === 1 ? '' : 's'}` : ''}</div><span>Score and game context are stamped automatically.</span>`;
+  const moments = [diaryBookend('start', summary.startedAt, 'Game started', sportName(summary.sport))];
+  moments.push(...items.map(diaryItemCard));
+  if (summary.finished) moments.push(diaryBookend('final', summary.updatedAt, `FINAL · ${summary.score}`, summary.detail || summary.period || ''));
+  el.albumGrid.innerHTML = items.length || summary.finished
+    ? moments.join('')
+    : moments.join('') + '<div class="album-empty diary-empty">Add a photo or quick note during the game. Scorer will stamp the live score and game state onto the moment.</div>';
   renderHistoryList(summary.matchId);
 }
 
 function sportName(id) { return SPORT_DEFS[id]?.name || NEW_SPORT_NAMES[id] || id; }
 
 function renderHistoryList(activeId) {
-  el.historyList.innerHTML = history.length ? history.map(h => `<button class="history-item ${h.matchId === activeId ? 'active' : ''}" data-history-match="${attr(h.matchId)}"><div class="history-title">${esc(h.title)}</div><div class="history-meta">${esc(sportName(h.sport))} · ${new Date(h.startedAt).toLocaleDateString()}</div><div class="history-score">${esc(h.score)}</div></button>`).join('') : '<div class="history-empty">Saved and completed matches will appear here. Their photo albums stay attached to the match.</div>';
+  el.historyList.innerHTML = history.length ? history.map(h => `<button class="history-item ${h.matchId === activeId ? 'active' : ''}" data-history-match="${attr(h.matchId)}"><div class="history-title">${esc(h.title)}</div><div class="history-meta">${esc(sportName(h.sport))} · ${new Date(h.startedAt).toLocaleDateString()}</div><div class="history-score">${esc(h.score)}</div></button>`).join('') : '<div class="history-empty">Saved and completed matches will appear here. Their photos and diary notes stay attached to the match.</div>';
 }
 
-function photoCard(photo) {
-  const url = URL.createObjectURL(photo.blob);
-  photoUrls.push(url);
-  const c = photo.context || {};
-  return `<article class="photo-card"><img src="${url}" alt="Game journal photo"><div class="photo-meta"><div class="photo-context">${esc(c.score || c.title || 'Match photo')}</div><div class="photo-detail">${esc([c.period, c.detail].filter(Boolean).join(' · '))}</div>${photo.caption ? `<div class="photo-caption">${esc(photo.caption)}</div>` : ''}<button class="photo-delete" data-delete-photo="${attr(photo.id)}">Delete</button></div></article>`;
+function diaryBookend(kind, timestamp, title, detail) {
+  return `<article class="diary-bookend ${kind}"><div class="diary-time">${esc(momentTime(timestamp))}</div><div><div class="diary-type">${kind === 'final' ? 'Final' : 'Start'}</div><div class="diary-bookend-title">${esc(title)}</div>${detail ? `<div class="diary-detail">${esc(detail)}</div>` : ''}</div></article>`;
+}
+
+function diaryItemCard(item) {
+  const c = item.context || {};
+  const context = diaryContextText(c);
+  const star = item.highlighted ? '★' : '☆';
+  if (item.kind === 'photo') {
+    const url = URL.createObjectURL(item.blob);
+    photoUrls.push(url);
+    return `<article class="diary-moment ${item.highlighted ? 'highlighted' : ''}"><div class="diary-rail"><span class="diary-dot photo"></span><span class="diary-time">${esc(momentTime(item.createdAt))}</span></div><div class="diary-card"><div class="diary-card-head"><div><div class="diary-type">Photo</div><div class="diary-score-stamp">${esc(c.score || c.title || 'Match photo')}</div></div><button class="diary-star" data-highlight-photo="${attr(item.id)}" aria-label="${item.highlighted ? 'Remove highlight' : 'Highlight moment'}" aria-pressed="${item.highlighted}">${star}</button></div>${context ? `<div class="diary-detail">${esc(context)}</div>` : ''}<img src="${url}" alt="Game diary photo">${item.caption ? `<div class="diary-text">${esc(item.caption)}</div>` : ''}<button class="photo-delete" data-delete-photo="${attr(item.id)}">Delete</button></div></article>`;
+  }
+  return `<article class="diary-moment ${item.highlighted ? 'highlighted' : ''}"><div class="diary-rail"><span class="diary-dot note"></span><span class="diary-time">${esc(momentTime(item.createdAt))}</span></div><div class="diary-card note-card"><div class="diary-card-head"><div><div class="diary-type">Note</div><div class="diary-score-stamp">${esc(c.score || c.title || 'Game note')}</div></div><button class="diary-star" data-highlight-note="${attr(item.id)}" aria-label="${item.highlighted ? 'Remove highlight' : 'Highlight moment'}" aria-pressed="${item.highlighted}">${star}</button></div>${context ? `<div class="diary-detail">${esc(context)}</div>` : ''}<div class="diary-text note-text">${esc(item.text)}</div><button class="photo-delete" data-delete-note="${attr(item.id)}">Delete</button></div></article>`;
+}
+
+function momentTime(timestamp) {
+  const date = new Date(Number(timestamp || Date.now()));
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
 async function capturePhoto(event) {
@@ -278,21 +309,68 @@ async function capturePhoto(event) {
   const state = normalizedState();
   if (!file || !state) return;
   try {
-    await addMatchPhoto(state.matchId, file, matchContext(state), el.photoCaption.value);
+    const photo = await addMatchPhoto(state.matchId, file, matchContext(state), el.photoCaption.value);
+    if (el.momentHighlight.checked) setPhotoHighlighted(photo.id, state.matchId, true);
     archiveState(state, false);
-    el.photoCaption.value = '';
+    resetMomentComposer();
     el.photoInput.value = '';
     viewingMatchId = state.matchId;
     await renderJournal();
-    toast('Photo added to match album');
+    toast('Photo added to Game Diary');
   } catch (error) { toast(error?.message || 'Could not save photo'); }
 }
 
-async function deletePhotoFromAlbum(event) {
-  const button = event.target.closest('[data-delete-photo]');
-  if (!button) return;
-  try { await deleteMatchPhoto(button.dataset.deletePhoto); await renderJournal(); toast('Photo removed'); }
-  catch { toast('Could not remove photo'); }
+async function saveQuickNote() {
+  const state = normalizedState();
+  if (!state) return toast('Start or resume a match before adding a note');
+  try {
+    addMatchNote(state.matchId, el.photoCaption.value, matchContext(state), el.momentHighlight.checked);
+    archiveState(state, false);
+    resetMomentComposer();
+    viewingMatchId = state.matchId;
+    await renderJournal();
+    toast('Note added to Game Diary');
+  } catch (error) { toast(error?.message || 'Could not save note'); }
+}
+
+async function handleDiaryAction(event) {
+  const deletePhoto = event.target.closest('[data-delete-photo]');
+  if (deletePhoto) {
+    try {
+      setPhotoHighlighted(deletePhoto.dataset.deletePhoto, viewingMatchId, false);
+      await deleteMatchPhoto(deletePhoto.dataset.deletePhoto);
+      await renderJournal();
+      toast('Photo removed');
+    } catch { toast('Could not remove photo'); }
+    return;
+  }
+  const deleteNote = event.target.closest('[data-delete-note]');
+  if (deleteNote) {
+    deleteMatchNote(deleteNote.dataset.deleteNote);
+    await renderJournal();
+    toast('Note removed');
+    return;
+  }
+  const photoStar = event.target.closest('[data-highlight-photo]');
+  if (photoStar) {
+    const highlighted = Boolean(getPhotoHighlights()?.[photoStar.dataset.highlightPhoto]?.highlighted);
+    setPhotoHighlighted(photoStar.dataset.highlightPhoto, viewingMatchId, !highlighted);
+    await renderJournal();
+    toast(highlighted ? 'Highlight removed' : 'Moment highlighted');
+    return;
+  }
+  const noteStar = event.target.closest('[data-highlight-note]');
+  if (noteStar) {
+    const note = listMatchNotes(viewingMatchId).find(item => item.id === noteStar.dataset.highlightNote);
+    setMatchNoteHighlighted(noteStar.dataset.highlightNote, !note?.highlighted);
+    await renderJournal();
+    toast(note?.highlighted ? 'Highlight removed' : 'Moment highlighted');
+  }
+}
+
+function resetMomentComposer() {
+  el.photoCaption.value = '';
+  el.momentHighlight.checked = false;
 }
 
 function revokeUrls() { for (const url of photoUrls) URL.revokeObjectURL(url); photoUrls = []; }
