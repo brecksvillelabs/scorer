@@ -8,6 +8,7 @@ const STATE_KEY = 'scorer-state-v2';
 const FAVORITES_KEY = 'scorer-favorite-teams-v1';
 const HISTORY_KEY = 'scorer-match-history-v1';
 const ACTIVE_ID_KEY = 'scorer-active-match-id-v1';
+const NEW_SPORT_NAMES = { lacrosse: 'Lacrosse', kabaddi: 'Kabaddi', baseball: 'Baseball' };
 const $ = id => document.getElementById(id);
 
 let favorites = readJson(FAVORITES_KEY, []);
@@ -19,6 +20,7 @@ let lastArchivedSignature = '';
 const el = {
   sportGrid: $('sportGrid'),
   inputNameA: $('inputNameA'), inputNameB: $('inputNameB'), inputColorA: $('inputColorA'), inputColorB: $('inputColorB'),
+  inputLogoA: $('inputLogoA'), inputLogoB: $('inputLogoB'),
   inputRosterA: $('inputRosterA'), inputRosterB: $('inputRosterB'), logoPreviewA: $('logoPreviewA'), logoPreviewB: $('logoPreviewB'),
   favoriteSelectA: $('favoriteSelectA'), favoriteSelectB: $('favoriteSelectB'), saveFavoriteA: $('saveFavoriteA'), saveFavoriteB: $('saveFavoriteB'), deleteFavoriteA: $('deleteFavoriteA'), deleteFavoriteB: $('deleteFavoriteB'),
   startGameBtn: $('startGameBtn'), resetSavedBtn: $('resetSavedBtn'),
@@ -258,8 +260,10 @@ async function renderJournal() {
   renderHistoryList(summary.matchId);
 }
 
+function sportName(id) { return SPORT_DEFS[id]?.name || NEW_SPORT_NAMES[id] || id; }
+
 function renderHistoryList(activeId) {
-  el.historyList.innerHTML = history.length ? history.map(h => `<button class="history-item ${h.matchId === activeId ? 'active' : ''}" data-history-match="${attr(h.matchId)}"><div class="history-title">${esc(h.title)}</div><div class="history-meta">${esc(SPORT_DEFS[h.sport]?.name || h.sport)} · ${new Date(h.startedAt).toLocaleDateString()}</div><div class="history-score">${esc(h.score)}</div></button>`).join('') : '<div class="history-empty">Saved and completed matches will appear here. Their photo albums stay attached to the match.</div>';
+  el.historyList.innerHTML = history.length ? history.map(h => `<button class="history-item ${h.matchId === activeId ? 'active' : ''}" data-history-match="${attr(h.matchId)}"><div class="history-title">${esc(h.title)}</div><div class="history-meta">${esc(sportName(h.sport))} · ${new Date(h.startedAt).toLocaleDateString()}</div><div class="history-score">${esc(h.score)}</div></button>`).join('') : '<div class="history-empty">Saved and completed matches will appear here. Their photo albums stay attached to the match.</div>';
 }
 
 function photoCard(photo) {
