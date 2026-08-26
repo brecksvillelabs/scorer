@@ -17,6 +17,7 @@ export function baseballBoardMarkup(state, helpers) {
   const innings = Array.from({ length: columns }, (_, i) => i + 1);
   const baseClass = key => b.bases[key] ? 'occupied' : '';
   const half = b.half === 'bottom' ? 'BOTTOM' : 'TOP';
+  const lineOrder = [b.firstBat, b.homeSide];
 
   return `<section class="v035-baseball-board">
     <div class="v035-baseball-hero">
@@ -25,12 +26,12 @@ export function baseballBoardMarkup(state, helpers) {
     </div>
 
     <div class="v035-line-score-wrap"><table class="v035-line-score"><thead><tr><th>Team</th>${innings.map(n=>`<th>${n}</th>`).join('')}<th>R</th><th>H</th><th>E</th></tr></thead><tbody>
-      ${['B','A'].map(side=>{const t=state[side==='A'?'teamA':'teamB']; const row=b.runsByInning[side]||[]; return `<tr class="${b.battingTeam===side?'batting-row':''}"><td><span class="v035-line-dot" style="--team-color:${safeColor(t.color)}"></span>${esc(t.name)}</td>${innings.map((_,i)=>`<td>${inningCell(row[i])}</td>`).join('')}<td class="total">${t.score}</td><td>${b.hits[side]}</td><td>${b.errors[side]}</td></tr>`;}).join('')}
+      ${lineOrder.map(side=>{const t=state[side==='A'?'teamA':'teamB']; const row=b.runsByInning[side]||[]; return `<tr class="${b.battingTeam===side?'batting-row':''}"><td><span class="v035-line-dot" style="--team-color:${safeColor(t.color)}"></span>${esc(t.name)}</td>${innings.map((_,i)=>`<td>${inningCell(row[i])}</td>`).join('')}<td class="total">${t.score}</td><td>${b.hits[side]}</td><td>${b.errors[side]}</td></tr>`;}).join('')}
     </tbody></table></div>
 
     <div class="v035-baseball-main">
       <article class="v035-baseball-team" style="--team-color:${safeColor(batting.color)}"><div class="team-head"><div class="team-logo">${logoMarkup(bat)}</div><div><div class="team-name">${esc(batting.name)}</div><div class="team-sub">AT BAT · ${b.outs} out${b.outs===1?'':'s'}</div></div></div><div class="v035-baseball-score">${batting.score}</div></article>
-      <div class="v035-diamond" aria-label="Base runners"><button class="base second ${baseClass('second')}" data-action="baseball-base" data-value="second" aria-pressed="${b.bases.second}">2</button><button class="base third ${baseClass('third')}" data-action="baseball-base" data-value="third" aria-pressed="${b.bases.third}">3</button><div class="plate">◆</div><button class="base first ${baseClass('first')}" data-action="baseball-base" data-value="first" aria-pressed="${b.bases.first}">1</button></div>
+      <div class="v035-diamond" aria-label="Base runners"><button class="base second ${baseClass('second')}" data-action="baseball-base" data-value="second" aria-label="Toggle runner on second base" aria-pressed="${b.bases.second}"><span>2</span></button><button class="base third ${baseClass('third')}" data-action="baseball-base" data-value="third" aria-label="Toggle runner on third base" aria-pressed="${b.bases.third}"><span>3</span></button><div class="plate"><span>◆</span></div><button class="base first ${baseClass('first')}" data-action="baseball-base" data-value="first" aria-label="Toggle runner on first base" aria-pressed="${b.bases.first}"><span>1</span></button></div>
     </div>
 
     <div class="v035-baseball-actions">
