@@ -3,7 +3,13 @@ import {
   badmintonPoint, cricketAction, setCricketRole, switchCricketInnings, advancePeriod, tickClock, swapSides,
   formatClock, formatOvers, strikeRate, economy, getPeriodText, teamKey, otherSide
 } from './sports.js';
+import {
+  EXTRA_SPORT_DEFS, createScorerState, lacrosseGoal, setLacrossePossession, lacrosseTimeout,
+  lacrosseShotClockAction, kabaddiAction, setKabaddiRaid, kabaddiRaidClockAction,
+  tickScorerClock, advanceScorerPeriod, swapScorerSides, getScorerPeriodText
+} from './v035-core.js';
 
+const SPORTS = { ...SPORT_DEFS, ...EXTRA_SPORT_DEFS };
 const STORAGE_KEY = 'scorer-state-v2';
 const $ = id => document.getElementById(id);
 let state = null;
@@ -27,10 +33,10 @@ const el = {
 function boot() {
   buildSportChoices(); bindEvents();
   const saved = loadState();
-  if (saved && saved.version === 2 && SPORT_DEFS[saved.sport]) {
+  if (saved && saved.version === 2 && SPORTS[saved.sport]) {
     state = saved; selectedSport = state.sport; pendingLogos = { A: state.teamA.logo || '', B: state.teamB.logo || '' }; closeSetup();
   } else {
-    state = createInitialState({ sport: selectedSport }); renderSportSettings(); openSetup(false);
+    state = createScorerState({ sport: selectedSport }, createInitialState); renderSportSettings(); openSetup(false);
   }
   render(); setInterval(clockTick, 1000);
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
@@ -38,7 +44,7 @@ function boot() {
 
 function bindEvents() {
   el.undoBtn.addEventListener('click', undo);
-  el.swapBtn.addEventListener('click', () => pushCommit(swapSides(state), 'Sides swapped'));
+  el.swapBtn.addEventListener('click', () => pushCommit(swapScorerSides(state, swapSides), 'Sides swapped'));
   el.editBtn.addEventListener('click', () => { hydrateSetup(); openSetup(true); });
   el.displayBtn.addEventListener('click', toggleDisplay); el.exitDisplayBtn.addEventListener('click', toggleDisplay);
   el.clockBtn.addEventListener('click', toggleClock); el.closeSetupBtn.addEventListener('click', closeSetup);
@@ -51,14 +57,14 @@ function bindEvents() {
   document.addEventListener('keydown', e => {
     if (e.target?.matches('input,select,textarea')) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
-    if (e.code === 'Space' && SPORT_DEFS[state?.sport]?.hasClock) { e.preventDefault(); toggleClock(); }
+    if (e.code === 'Space' && SPORTS[state?.sport]?.hasClock) { e.preventDefault(); toggleClock(); }
     if (e.key.toLowerCase() === 'f') toggleDisplay();
   });
 }
 
 function buildSportChoices() {
   el.sportGrid.innerHTML = '';
-  Object.values(SPORT_DEFS).forEach(sport => {
+  Object.values(SPORTS).forEach(sport => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'sport-choice'; b.dataset.sport = sport.id;
     b.innerHTML = `<span class="sport-icon">${sport.icon}</span><strong>${sport.name}</strong>`;
     b.addEventListener('click', () => { selectedSport = sport.id; updateSportChoice(); renderSportSettings(); });
@@ -70,7 +76,7 @@ function updateSportChoice() { document.querySelectorAll('.sport-choice').forEac
 
 function renderSportSettings() {
   updateSportChoice(); const s = selectedSport;
-  let body = `<label class="section-label">${SPORT_DEFS[s].name} format</label><div class="sport-settings-grid">`;
+  let body = `<label class="section-label">${SPORTS[s].name} format</label><div class="sport-settings-grid">`;
   if (s === 'volleyball') body += `
     <label>Match format<select id="settingBestOf"><option value="3">Best of 3</option><option value="5" selected>Best of 5</option></select></label>
     <label>Regular set to<input id="settingSetTo" type="number" min="1" value="25"></label>
@@ -80,15 +86,31 @@ function renderSportSettings() {
     const mins = s === 'basketball' ? 10 : s === 'soccer' ? 45 : 15;
     body += `<label>Period length (minutes)<input id="settingMinutes" type="number" min="1" max="90" value="${mins}"></label>`;
   }
+  if (s === 'lacrosse') body += `
+    <label>Discipline<select id="settingLacrosseDiscipline"><option value="field" selected>Field lacrosse</option><option value="sixes">Sixes</option></select></label>
+    <label>Quarter length (minutes)<input id="settingMinutes" type="number" min="1" max="30" value="15"></label>
+    <label>Shot clock<select id="settingLacrosseShotClock"><option value="0" selected>Off / league-managed</option><option value="80">80 seconds</option><option value="30">30 seconds</option></select></label>`;
+  if (s === 'kabaddi') body += `
+    <label>Half length (minutes)<input id="settingMinutes" type="number" min="1" max="40" value="20"></label>
+    <label>Raid clock (seconds)<input id="settingKabaddiRaidSeconds" type="number" min="10" max="60" value="30"></label>
+    <label>First raid<select id="settingKabaddiFirstRaid"><option value="A">Side A</option><option value="B">Side B</option></select></label>`;
   if (s === 'cricket') body += `
     <label>Format<select id="settingCricketFormat"><option value="T20">T20</option><option value="ODI">ODI</option><option value="Custom">Custom</option></select></label>
     <label>Overs per innings<input id="settingOvers" type="number" min="1" max="500" value="20"></label>
     <label>Batting first<select id="settingBatting"><option value="A">Side A</option><option value="B">Side B</option></select></label>`;
   if (s === 'tennis') body += `<label>Match format<select id="settingTennisBestOf"><option value="3" selected>Best of 3 sets</option><option value="5">Best of 5 sets</option></select></label>`;
   if (s === 'badminton') body += `<label>Match format<select id="settingBadmintonBestOf"><option value="3" selected>Best of 3 games</option></select></label><label>Game to<input id="settingBadmintonGameTo" type="number" value="21" min="1" max="30"></label>`;
-  body += `<div class="setting-note">Roster fields accept one name per line or pasted CSV names. Cricket uses those rosters for active batters and bowlers; racket sports can use player or doubles-pair names.</div></div>`;
+  const note = s === 'lacrosse' ? 'Field and Sixes use different timing. Shot-clock use is configurable so youth/domestic rules can match the competition.' :
+    s === 'kabaddi' ? 'Quick Score keeps raid ownership and the raid clock prominent. Touch/bonus points can accumulate before the raid is ended.' :
+    'Roster fields accept one name per line or pasted CSV names. Cricket uses those rosters for active batters and bowlers; racket sports can use player or doubles-pair names.';
+  body += `<div class="setting-note">${note}</div></div>`;
   el.sportSettings.innerHTML = body;
   $('settingCricketFormat')?.addEventListener('change', e => { if (e.target.value === 'T20') $('settingOvers').value = 20; if (e.target.value === 'ODI') $('settingOvers').value = 50; });
+  $('settingLacrosseDiscipline')?.addEventListener('change', e => {
+    const sixes = e.target.value === 'sixes';
+    $('settingMinutes').value = sixes ? 8 : 15;
+    $('settingLacrosseShotClock').value = sixes ? 30 : 0;
+  });
 }
 
 function openSetup(editing = false) { editingExisting = editing; el.startGameBtn.textContent = editing ? 'Apply changes' : 'Start scoreboard'; el.setupModal.classList.remove('hidden'); el.setupModal.setAttribute('aria-hidden','false'); }
@@ -113,6 +135,10 @@ function hydrateSetup() {
     if ($('settingTennisBestOf')) $('settingTennisBestOf').value = state.tennis.bestOf;
     if ($('settingBadmintonBestOf')) $('settingBadmintonBestOf').value = state.badminton.bestOf;
     if ($('settingBadmintonGameTo')) $('settingBadmintonGameTo').value = state.badminton.gameTo;
+    if ($('settingLacrosseDiscipline')) $('settingLacrosseDiscipline').value = state.lacrosse?.discipline || 'field';
+    if ($('settingLacrosseShotClock')) $('settingLacrosseShotClock').value = String(state.lacrosse?.shotClockSeconds || 0);
+    if ($('settingKabaddiRaidSeconds')) $('settingKabaddiRaidSeconds').value = state.kabaddi?.raidSeconds || 30;
+    if ($('settingKabaddiFirstRaid')) $('settingKabaddiFirstRaid').value = state.kabaddi?.firstHalfStartingRaid || 'A';
   },0);
 }
 
@@ -123,29 +149,41 @@ function startFromSetup() {
     teamB:{ name:el.inputNameB.value.trim() || 'Away', color:el.inputColorB.value, logo:pendingLogos.B, roster:parseRosterText(el.inputRosterB.value) },
     bestOf:Number($('settingBestOf')?.value || 5), setTo:Number($('settingSetTo')?.value || 25), decidingSetTo:Number($('settingDecidingSetTo')?.value || 15), winBy:Number($('settingWinBy')?.value || 2),
     periodMinutes:Number($('settingMinutes')?.value || 10), cricketFormat:$('settingCricketFormat')?.value || 'T20', oversLimit:Number($('settingOvers')?.value || 20), battingTeam:$('settingBatting')?.value || 'A',
-    tennisBestOf:Number($('settingTennisBestOf')?.value || 3), badmintonBestOf:Number($('settingBadmintonBestOf')?.value || 3), badmintonGameTo:Number($('settingBadmintonGameTo')?.value || 21)
+    tennisBestOf:Number($('settingTennisBestOf')?.value || 3), badmintonBestOf:Number($('settingBadmintonBestOf')?.value || 3), badmintonGameTo:Number($('settingBadmintonGameTo')?.value || 21),
+    lacrosseDiscipline:$('settingLacrosseDiscipline')?.value || 'field', lacrosseShotClock:Number($('settingLacrosseShotClock')?.value || 0),
+    kabaddiRaidSeconds:Number($('settingKabaddiRaidSeconds')?.value || 30), kabaddiFirstRaid:$('settingKabaddiFirstRaid')?.value || 'A'
   };
   if (editingExisting && selectedSport === state.sport) {
     const n = clone(state); Object.assign(n.teamA, opts.teamA); Object.assign(n.teamB, opts.teamB);
     if (selectedSport === 'volleyball') Object.assign(n.volleyball,{bestOf:opts.bestOf,setTo:opts.setTo,decidingSetTo:opts.decidingSetTo,winBy:opts.winBy});
-    if (['basketball','soccer','football'].includes(selectedSport)) { n.clock.periodSeconds = opts.periodMinutes * 60; n.clock.targetSeconds = opts.periodMinutes * 60; }
+    if (['basketball','soccer','football','lacrosse','kabaddi'].includes(selectedSport)) { n.clock.periodSeconds = opts.periodMinutes * 60; n.clock.targetSeconds = opts.periodMinutes * 60; }
+    if (selectedSport === 'lacrosse') {
+      n.lacrosse.discipline = opts.lacrosseDiscipline;
+      n.lacrosse.shotClockSeconds = opts.lacrosseShotClock;
+      n.lacrosse.shotClock = opts.lacrosseShotClock;
+      n.lacrosse.shotClockRunning = false;
+    }
+    if (selectedSport === 'kabaddi') {
+      n.kabaddi.raidSeconds = opts.kabaddiRaidSeconds;
+      n.kabaddi.raidClock = Math.min(n.kabaddi.raidClock, opts.kabaddiRaidSeconds);
+      n.kabaddi.firstHalfStartingRaid = opts.kabaddiFirstRaid;
+    }
     if (selectedSport === 'cricket') { n.cricket.format=opts.cricketFormat; n.cricket.oversLimit=opts.oversLimit; }
     if (selectedSport === 'tennis') n.tennis.bestOf=opts.tennisBestOf;
     if (selectedSport === 'badminton') { n.badminton.bestOf=opts.badmintonBestOf; n.badminton.gameTo=opts.badmintonGameTo; }
     pushCommit(n,'Match settings updated');
-  } else { history=[]; state=createInitialState(opts); save(); render(); toast(`${SPORT_DEFS[selectedSport].name} ready`); }
+  } else { history=[]; state=createScorerState(opts, createInitialState); save(); render(); toast(`${SPORTS[selectedSport].name} ready`); }
   editingExisting=false; closeSetup();
 }
 
 function render() {
-  if (!state) return; const def=SPORT_DEFS[state.sport];
-  el.sportPill.textContent=`${def.icon} ${def.name}`; el.periodText.textContent=getPeriodText(state); el.clockBtn.classList.toggle('hidden',!def.hasClock); el.clockBtn.textContent=formatClock(state.clock.seconds);
-  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else renderTeamSport();
+  if (!state) return; const def=SPORTS[state.sport];
+  el.sportPill.textContent=`${def.icon} ${def.name}`; el.periodText.textContent=getScorerPeriodText(state, getPeriodText); el.clockBtn.classList.toggle('hidden',!def.hasClock); el.clockBtn.textContent=formatClock(state.clock.seconds);
+  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else if (state.sport==='lacrosse') renderLacrosse(); else if (state.sport==='kabaddi') renderKabaddi(); else renderTeamSport();
   renderTools(); el.undoBtn.disabled=history.length===0; el.saveStatus.textContent='Saved';
 }
 
 function renderTeamSport() {
-  const sport=state.sport;
   el.gameSurface.innerHTML=`<div class="board dual-board">
     ${teamCard('A', teamMeta('A'), actionButtons('A'))}
     ${teamCard('B', teamMeta('B'), actionButtons('B'))}
@@ -178,9 +216,28 @@ function teamChips(side) {
 }
 function centerStatus(){
   if(state.finished)return `<strong>${winnerText()}</strong>`;
-  if(state.sport==='volleyball')return `<strong>${state.teamA.sets}–${state.teamB.sets} sets</strong><span>${getPeriodText(state)}</span>`;
+  if(state.sport==='volleyball')return `<strong>${state.teamA.sets}–${state.teamB.sets} sets</strong><span>${getScorerPeriodText(state,getPeriodText)}</span>`;
   if(state.sport==='football')return `<strong>${ordinal(state.football.down)} & ${state.football.distance}</strong><span>${esc(state[state.football.possession==='A'?'teamA':'teamB'].name)} ball</span>`;
-  return `<strong>${state.clock.running?'Clock running':'Ready'}</strong><span>${getPeriodText(state)}</span>`;
+  return `<strong>${state.clock.running?'Clock running':'Ready'}</strong><span>${getScorerPeriodText(state,getPeriodText)}</span>`;
+}
+
+function logoMarkup(side){const t=state[teamKey(side)];return t.logo?`<img src="${t.logo}" alt="">`:esc((t.name||'?')[0].toUpperCase());}
+
+function renderLacrosse(){
+  const l=state.lacrosse; const shotOn=l.shotClockSeconds>0;
+  el.gameSurface.innerHTML=`<section class="v035-lax-board">
+    <div class="v035-sport-hero"><div><div class="eyebrow">${l.discipline==='sixes'?'LACROSSE SIXES':'FIELD LACROSSE'}</div><strong>${getScorerPeriodText(state,getPeriodText)}</strong></div><div class="v035-clock-stack"><span>Game ${formatClock(state.clock.seconds)}</span>${shotOn?`<b class="${l.shotClock<=10?'urgent':''}">Shot ${l.shotClock}</b>`:''}</div></div>
+    <div class="v035-lax-teams">${['A','B'].map(side=>{const t=state[teamKey(side)];return `<article class="v035-lax-team" style="--team-color:${safeColor(t.color)}"><div class="team-head"><div class="team-logo">${logoMarkup(side)}</div><div><div class="team-name">${esc(t.name)}</div><div class="team-sub">${l.possession===side?'● Possession':'Defense'} · ${l.timeouts[side]} TO</div></div></div><div class="v035-lax-score">${t.score}</div><div class="v035-score-row"><button class="score-btn primary" data-action="lacrosse-goal" data-side="${side}" data-delta="1">Goal +1</button><button class="score-btn" data-action="lacrosse-goal" data-side="${side}" data-delta="-1">−1</button></div></article>`;}).join('')}</div>
+  </section>`;
+}
+
+function renderKabaddi(){
+  const k=state.kabaddi, raid=k.raidingTeam, defense=otherSide(raid), raidTeam=state[teamKey(raid)], defenseTeam=state[teamKey(defense)];
+  el.gameSurface.innerHTML=`<section class="v035-kabaddi-board">
+    <div class="v035-kabaddi-head"><div><div class="eyebrow">KABADDI · ${getScorerPeriodText(state,getPeriodText).toUpperCase()}</div><strong>${formatClock(state.clock.seconds)}</strong></div><div class="v035-raid-clock ${k.raidClock<=10?'urgent':''}"><span>RAID</span><b>${k.raidClock}</b></div></div>
+    <div class="v035-kabaddi-teams">${['A','B'].map(side=>{const t=state[teamKey(side)];return `<article class="v035-kabaddi-team ${raid===side?'raiding':''}" style="--team-color:${safeColor(t.color)}"><div class="team-head"><div class="team-logo">${logoMarkup(side)}</div><div><div class="team-name">${esc(t.name)}</div><div class="team-sub">${raid===side?'RAIDING':'DEFENDING'}</div></div></div><div class="v035-kabaddi-score">${t.score}</div><button class="mini-btn" data-action="kabaddi-correct" data-side="${side}">Score −1</button></article>`;}).join('')}</div>
+    <div class="v035-raid-panel"><div class="v035-raid-title"><span>${esc(raidTeam.name)} raid</span><strong>Current raid +${k.raidPoints}</strong></div><div class="v035-raid-actions"><button class="score-btn primary" data-action="kabaddi" data-value="touch">Touch +1</button><button class="score-btn" data-action="kabaddi" data-value="bonus">Bonus +1</button><button class="score-btn" data-action="kabaddi" data-value="allOut">All Out +2</button><button class="score-btn danger" data-action="kabaddi" data-value="tackle">${esc(defenseTeam.name)} tackle +1 & end</button><button class="score-btn" data-action="kabaddi" data-value="empty">Empty raid</button><button class="score-btn primary" data-action="kabaddi" data-value="end">End raid →</button></div></div>
+  </section>`;
 }
 
 function renderTennis(){
@@ -208,7 +265,7 @@ function renderCricket(){
   const rr=bat.balls?(bat.runs/(bat.balls/6)).toFixed(2):'0.00'; const ballsLeft=Math.max(0,c.oversLimit*6-bat.balls); const need=c.target?Math.max(0,c.target-bat.runs):null; const req=c.target&&ballsLeft?((need)/(ballsLeft/6)).toFixed(2):null;
   const battingLogo=bat.logo?`<img src="${bat.logo}" alt="">`:esc((bat.name||'?')[0]);
   el.gameSurface.innerHTML=`<div class="cricket-board">
-    <section class="cricket-hero" style="--bat-color:${safeColor(bat.color)}"><div class="cricket-topline"><div class="cricket-team"><div class="team-logo">${battingLogo}</div><div><div class="team-name">${esc(bat.name)}</div><div class="cricket-badge">BATTING · ${getPeriodText(state).toUpperCase()}</div></div></div><div class="team-sub">vs ${esc(field.name)}</div></div>
+    <section class="cricket-hero" style="--bat-color:${safeColor(bat.color)}"><div class="cricket-topline"><div class="cricket-team"><div class="team-logo">${battingLogo}</div><div><div class="team-name">${esc(bat.name)}</div><div class="cricket-badge">BATTING · ${getScorerPeriodText(state,getPeriodText).toUpperCase()}</div></div></div><div class="team-sub">vs ${esc(field.name)}</div></div>
       <div class="cricket-scoreline"><div class="cricket-score">${bat.runs}/${bat.wickets}</div><div class="cricket-overs">${formatOvers(bat.balls)} overs</div></div>
       <div class="cricket-context"><span class="stat-chip">Run rate ${rr}</span>${c.target?`<span class="stat-chip">Target ${c.target}</span><span class="stat-chip">Need ${need} from ${ballsLeft}</span>${req?`<span class="stat-chip">Req ${req}</span>`:''}`:''}<span class="stat-chip">Extras ${c.extras[batSide].wides+c.extras[batSide].noBalls}</span></div>
     </section>
@@ -225,7 +282,14 @@ function renderTools(){
   if(s==='cricket'){ const c=state.cricket,batSide=c.battingTeam,fieldSide=otherSide(batSide),bat=state[teamKey(batSide)],field=state[teamKey(fieldSide)];
     el.sportTools.innerHTML=`<div class="tool-panel">${c.needsBowler?'<div class="bowler-alert">Over complete — select the next bowler before continuing.</div>':''}<div class="role-selects"><label>Striker<select data-role="striker">${options(bat.roster,c.striker)}</select></label><label>Non-striker<select data-role="nonStriker">${options(bat.roster,c.nonStriker)}</select></label><label>Bowler<select data-role="bowler">${options(field.roster,c.bowler)}</select></label></div><div class="tool-row"><button class="tool-btn" data-action="switch-innings">${c.innings===1?'Start 2nd innings':'Finish match'}</button></div></div>`; return; }
   if(s==='tennis'||s==='badminton'){ const serving=s==='tennis'?state.tennis.servingTeam:state.badminton.servingTeam; el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn ${serving==='A'?'active':''}" data-action="set-server" data-side="A">${esc(state.teamA.name)} serves</button><button class="tool-btn ${serving==='B'?'active':''}" data-action="set-server" data-side="B">${esc(state.teamB.name)} serves</button></div></div>`; return; }
-  const periodBtns = SPORT_DEFS[s].hasClock ? `<button class="tool-btn" data-action="period" data-delta="-1">Previous ${SPORT_DEFS[s].periodLabel}</button><button class="tool-btn" data-action="period" data-delta="1">Next ${SPORT_DEFS[s].periodLabel}</button>` : '';
+  if(s==='lacrosse'){
+    const shot=state.lacrosse.shotClockSeconds>0?`<button class="tool-btn" data-action="lacrosse-shot" data-value="toggle">${state.lacrosse.shotClockRunning?'Pause':'Start'} shot clock</button><button class="tool-btn" data-action="lacrosse-shot" data-value="reset">Reset shot ${state.lacrosse.shotClockSeconds}</button>`:'';
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Quarter</button><button class="tool-btn" data-action="period" data-delta="1">Next Quarter</button><button class="tool-btn ${state.lacrosse.possession==='A'?'active':''}" data-action="lacrosse-possession" data-side="A">${esc(state.teamA.name)} possession</button><button class="tool-btn ${state.lacrosse.possession==='B'?'active':''}" data-action="lacrosse-possession" data-side="B">${esc(state.teamB.name)} possession</button>${shot}<button class="tool-btn" data-action="lacrosse-timeout" data-side="A">Timeout · A</button><button class="tool-btn" data-action="lacrosse-timeout" data-side="B">Timeout · B</button></div></div>`; return;
+  }
+  if(s==='kabaddi'){
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Half</button><button class="tool-btn" data-action="period" data-delta="1">Next Half</button><button class="tool-btn ${state.kabaddi.raidingTeam==='A'?'active':''}" data-action="kabaddi-set-raid" data-side="A">A raids</button><button class="tool-btn ${state.kabaddi.raidingTeam==='B'?'active':''}" data-action="kabaddi-set-raid" data-side="B">B raids</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="toggle">${state.kabaddi.raidRunning?'Pause':'Start'} raid timer</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="reset">Reset ${state.kabaddi.raidSeconds}s</button><button class="tool-btn" data-action="kabaddi-technical" data-side="A">Technical +1 · A</button><button class="tool-btn" data-action="kabaddi-technical" data-side="B">Technical +1 · B</button><button class="tool-btn" data-action="timeout" data-side="A">Timeout · A</button><button class="tool-btn" data-action="timeout" data-side="B">Timeout · B</button></div></div>`; return;
+  }
+  const periodBtns = SPORTS[s].hasClock ? `<button class="tool-btn" data-action="period" data-delta="-1">Previous ${SPORTS[s].periodLabel}</button><button class="tool-btn" data-action="period" data-delta="1">Next ${SPORTS[s].periodLabel}</button>` : '';
   let extras='';
   if(s==='volleyball') extras=sideTools('Timeout','timeout','volleyball');
   if(s==='basketball') extras=sideTools('Foul +','foul','basketball')+sideTools('Timeout','timeout','basketball')+possessionTools('basketball');
@@ -243,9 +307,18 @@ function handleActionClick(e){
   else if(action==='volleyball-point') n=volleyballPoint(state,side,delta);
   else if(action==='tennis-point') n=tennisPoint(state,side);
   else if(action==='badminton-point') n=badmintonPoint(state,side);
+  else if(action==='lacrosse-goal') n=lacrosseGoal(state,side,delta);
+  else if(action==='lacrosse-possession') n=setLacrossePossession(state,side);
+  else if(action==='lacrosse-timeout') n=lacrosseTimeout(state,side);
+  else if(action==='lacrosse-shot') n=lacrosseShotClockAction(state,b.dataset.value);
+  else if(action==='kabaddi') n=kabaddiAction(state,b.dataset.value);
+  else if(action==='kabaddi-correct') n=kabaddiAction(state,'correct',side);
+  else if(action==='kabaddi-technical') n=kabaddiAction(state,'technical',side);
+  else if(action==='kabaddi-set-raid') n=setKabaddiRaid(state,side);
+  else if(action==='kabaddi-raid-clock') n=kabaddiRaidClockAction(state,b.dataset.value);
   else if(action==='cricket') n=cricketAction(state,b.dataset.value);
   else if(action==='switch-innings') n=switchCricketInnings(state);
-  else if(action==='period') n=advancePeriod(state,delta);
+  else if(action==='period') n=advanceScorerPeriod(state,delta,advancePeriod);
   else { n=clone(state); mutateUtility(n,action,side,delta); }
   pushCommit(n,actionLabel(action,side));
 }
@@ -263,13 +336,17 @@ function mutateUtility(n,action,side,delta){
 }
 function handleRoleChange(e){ const role=e.target.dataset.role;if(!role)return;pushCommit(setCricketRole(state,role,e.target.value),`${role} changed`); }
 
-function toggleClock(){ if(!SPORT_DEFS[state.sport].hasClock)return;const n=clone(state);n.clock.running=!n.clock.running;pushCommit(n,n.clock.running?'Clock started':'Clock paused',false);if(n.clock.running)requestWake(); }
-function clockTick(){ if(!state?.clock?.running)return;state=tickClock(state);save(false);render(); }
+function toggleClock(){ if(!SPORTS[state.sport].hasClock)return;const n=clone(state);n.clock.running=!n.clock.running;pushCommit(n,n.clock.running?'Clock started':'Clock paused',false);if(n.clock.running)requestWake(); }
+function clockTick(){
+  const extraRunning=(state?.sport==='lacrosse'&&state.lacrosse?.shotClockRunning)||(state?.sport==='kabaddi'&&state.kabaddi?.raidRunning);
+  if(!state?.clock?.running&&!extraRunning)return;
+  state=tickScorerClock(state,tickClock);save(false);render();
+}
 function undo(){ if(!history.length)return;state=history.pop();save();render();toast('Undone'); }
 function pushCommit(next,msg,record=true){ if(!next)return;if(record)history.push(clone(state));state=next;save();render();toast(msg); }
 function save(show=true){ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(show)el.saveStatus.textContent='Saved';}catch{toast('Could not save locally');} }
 function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch{return null;}}
-function newMatch(){ localStorage.removeItem(STORAGE_KEY);history=[];editingExisting=false;selectedSport='volleyball';pendingLogos={A:'',B:''};state=createInitialState({sport:selectedSport});el.inputNameA.value='Home';el.inputNameB.value='Away';el.inputColorA.value='#2563eb';el.inputColorB.value='#e11d48';el.inputRosterA.value='';el.inputRosterB.value='';renderSportSettings();render();toast('New match ready'); }
+function newMatch(){ localStorage.removeItem(STORAGE_KEY);history=[];editingExisting=false;selectedSport='volleyball';pendingLogos={A:'',B:''};state=createScorerState({sport:selectedSport},createInitialState);el.inputNameA.value='Home';el.inputNameB.value='Away';el.inputColorA.value='#2563eb';el.inputColorB.value='#e11d48';el.inputRosterA.value='';el.inputRosterB.value='';renderSportSettings();render();toast('New match ready'); }
 
 async function toggleDisplay(){ const entering=!el.appShell.classList.contains('display-mode');el.appShell.classList.toggle('display-mode',entering);el.exitDisplayBtn.classList.toggle('hidden',!entering);if(entering){requestWake();try{await document.documentElement.requestFullscreen?.();}catch{}}else{try{if(document.fullscreenElement)await document.exitFullscreen();}catch{}} }
 async function requestWake(){try{if('wakeLock'in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch{}}
