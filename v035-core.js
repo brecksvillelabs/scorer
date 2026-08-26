@@ -45,6 +45,7 @@ export function createScorerState(options, baseCreateInitialState) {
     const discipline = options.lacrosseDiscipline === 'sixes' ? 'sixes' : 'field';
     const minutes = Number(options.periodMinutes || (discipline === 'sixes' ? 8 : 15));
     const shotClockSeconds = Number(options.lacrosseShotClock ?? (discipline === 'sixes' ? 30 : 0));
+    const timeoutsPerHalf = discipline === 'sixes' ? 1 : 2;
     const next = baseCreateInitialState({ ...options, sport: 'football', periodMinutes: minutes });
     next.sport = 'lacrosse';
     next.maxPeriods = 4;
@@ -55,7 +56,8 @@ export function createScorerState(options, baseCreateInitialState) {
     next.lacrosse = {
       discipline,
       possession: options.lacrossePossession === 'B' ? 'B' : 'A',
-      timeouts: { A: 2, B: 2 },
+      timeoutsPerHalf,
+      timeouts: { A: timeoutsPerHalf, B: timeoutsPerHalf },
       shotClockSeconds,
       shotClock: shotClockSeconds,
       shotClockRunning: false,
@@ -82,6 +84,7 @@ export function createScorerState(options, baseCreateInitialState) {
     raidRunning: false,
     raidPoints: 0,
     raidsCompleted: { A: 0, B: 0 },
+    timeoutsPerHalf: 2,
     timeouts: { A: 2, B: 2 },
     matchWinner: null
   };
@@ -103,6 +106,9 @@ export function lacrosseGoal(state, side, delta = 1) {
     next.lacrosse.shotClock = next.lacrosse.shotClockSeconds;
     next.lacrosse.shotClockRunning = false;
   }
+  // Sixes restarts with the goalkeeper of the team that conceded the goal.
+  // Field lacrosse uses a faceoff/draw, so possession stays manual there.
+  if (delta > 0 && next.lacrosse.discipline === 'sixes') next.lacrosse.possession = otherSide(side);
   next.updatedAt = Date.now();
   return next;
 }
@@ -189,10 +195,10 @@ export function kabaddiAction(state, action, side = null) {
     next[teamKey(raidSide)].score += 1;
     next.kabaddi.raidPoints += 1;
     appendEvent(next, action === 'touch' ? 'kabaddi.touch_point' : 'kabaddi.bonus_point', { side: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
-  } else if (action === 'allOut') {
-    next[teamKey(raidSide)].score += 2;
-    next.kabaddi.raidPoints += 2;
-    appendEvent(next, 'kabaddi.all_out_bonus', { side: raidSide, points: 2, scoreA: next.teamA.score, scoreB: next.teamB.score });
+  } else if (action === 'allOut' && ['A','B'].includes(side)) {
+    next[teamKey(side)].score += 2;
+    if (side === raidSide) next.kabaddi.raidPoints += 2;
+    appendEvent(next, 'kabaddi.all_out_bonus', { side, points: 2, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
   } else if (action === 'tackle') {
     next[teamKey(defenseSide)].score += 1;
     appendEvent(next, 'kabaddi.tackle_point', { side: defenseSide, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
@@ -241,9 +247,17 @@ export function advanceScorerPeriod(state, delta, baseAdvancePeriod) {
   if (next.sport === 'lacrosse' && next.lacrosse) {
     next.lacrosse.shotClock = next.lacrosse.shotClockSeconds;
     next.lacrosse.shotClockRunning = false;
+    if (before === 2 && next.period === 3) {
+      const count = Number(next.lacrosse.timeoutsPerHalf ?? (next.lacrosse.discipline === 'sixes' ? 1 : 2));
+      next.lacrosse.timeouts = { A: count, B: count };
+    }
   }
   if (next.sport === 'kabaddi' && next.kabaddi) {
-    if (next.period === 2) next.kabaddi.raidingTeam = otherSide(next.kabaddi.firstHalfStartingRaid);
+    if (next.period === 2) {
+      next.kabaddi.raidingTeam = otherSide(next.kabaddi.firstHalfStartingRaid);
+      const count = Number(next.kabaddi.timeoutsPerHalf || 2);
+      next.kabaddi.timeouts = { A: count, B: count };
+    }
     next.kabaddi.raidClock = next.kabaddi.raidSeconds;
     next.kabaddi.raidRunning = false;
     next.kabaddi.raidPoints = 0;
