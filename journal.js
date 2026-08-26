@@ -1,4 +1,5 @@
 import { formatClock, formatOvers, formatTennisPoint, getPeriodText, otherSide, teamKey } from './sports.js';
+import { getScorerPeriodText } from './v035-core.js';
 import { getBaseballPeriodText } from './baseball-core.js';
 
 const DB_NAME = 'scorer-media-v1';
@@ -46,11 +47,17 @@ export function hasMatchActivity(state) {
   return false;
 }
 
+function sportPeriod(state) {
+  if (state.sport === 'baseball') return getBaseballPeriodText(state);
+  if (state.sport === 'lacrosse' || state.sport === 'kabaddi') return getScorerPeriodText(state, getPeriodText);
+  return getPeriodText(state);
+}
+
 export function matchContext(state) {
   if (!state) return { title: 'Match', detail: '' };
   const a = state.teamA?.name || 'Side A';
   const b = state.teamB?.name || 'Side B';
-  const period = state.sport === 'baseball' ? getBaseballPeriodText(state) : getPeriodText(state);
+  const period = sportPeriod(state);
   const base = { sport: state.sport, title: `${a} vs ${b}`, period, timestamp: Date.now() };
   if (state.sport === 'cricket') {
     const batSide = state.cricket.battingTeam;
@@ -63,6 +70,17 @@ export function matchContext(state) {
   }
   if (state.sport === 'badminton') {
     return { ...base, score: `${state.badminton.games.A}-${state.badminton.games.B} games`, detail: `${state.badminton.points.A}-${state.badminton.points.B} points` };
+  }
+  if (state.sport === 'lacrosse') {
+    const l = state.lacrosse;
+    const possession = state[teamKey(l.possession)]?.name || `Side ${l.possession}`;
+    const shot = l.shotClockSeconds > 0 ? ` · Shot ${l.shotClock}` : '';
+    return { ...base, score: `${state.teamA.score}-${state.teamB.score}`, detail: `${period} · ${formatClock(state.clock.seconds)} · ${possession} possession${shot}` };
+  }
+  if (state.sport === 'kabaddi') {
+    const k = state.kabaddi;
+    const raider = state[teamKey(k.raidingTeam)]?.name || `Side ${k.raidingTeam}`;
+    return { ...base, score: `${state.teamA.score}-${state.teamB.score}`, detail: `${period} · ${formatClock(state.clock.seconds)} · ${raider} raid · ${k.raidClock}s` };
   }
   if (state.sport === 'baseball') {
     const bb = state.baseball;
