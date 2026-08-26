@@ -1,11 +1,13 @@
 {
   "name": "scorer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "private": true,
   "scripts": {
     "test": "node --test",
-    "check": "node --check app.js && node --check sports.js && node --test"
+    "check": "node --check app.js && node --check sports.js && node --check journal.js && node --check enhancements.js && node --test"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

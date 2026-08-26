@@ -57,3 +57,15 @@ The v0.2 regression suite covers volleyball set logic, tennis deuce/advantage an
 ## Deployment
 
 GitHub Actions runs CI and deploys `main` to GitHub Pages.
+
+
+## v0.3 — team library and game journal
+
+- Save sport-aware favorite teams with name, color, logo and roster.
+- Load saved teams into either side of match setup.
+- Changing sports clears stale player lists automatically.
+- New matches no longer generate fake roster names.
+- Game Journal captures photos with score/set/quarter/innings context at the instant of capture.
+- Photos remain local in IndexedDB in v0.3.
+- Match history preserves score summaries and linked albums.
+- Future live website/app sync is documented in `docs/LIVE_SYNC_ARCHITECTURE.md`.

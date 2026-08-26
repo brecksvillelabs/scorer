@@ -8,21 +8,20 @@ export const SPORT_DEFS = {
   badminton: { id: 'badminton', name: 'Badminton', icon: '🏸', periodLabel: 'Game', hasClock: false }
 };
 
-const defaultRoster = (prefix, count = 11) => Array.from({ length: count }, (_, i) => `${prefix} ${i + 1}`);
-
 export const DEFAULT_TEAMS = {
-  A: { name: 'Home', color: '#2563eb', logo: '', score: 0, sets: 0, gamesWon: 0, fouls: 0, yellows: 0, reds: 0, runs: 0, wickets: 0, balls: 0, roster: defaultRoster('Home Player') },
-  B: { name: 'Away', color: '#e11d48', logo: '', score: 0, sets: 0, gamesWon: 0, fouls: 0, yellows: 0, reds: 0, runs: 0, wickets: 0, balls: 0, roster: defaultRoster('Away Player') }
+  A: { name: 'Home', color: '#2563eb', logo: '', score: 0, sets: 0, gamesWon: 0, fouls: 0, yellows: 0, reds: 0, runs: 0, wickets: 0, balls: 0, roster: [] },
+  B: { name: 'Away', color: '#e11d48', logo: '', score: 0, sets: 0, gamesWon: 0, fouls: 0, yellows: 0, reds: 0, runs: 0, wickets: 0, balls: 0, roster: [] }
 };
 
 export function clone(value) { return JSON.parse(JSON.stringify(value)); }
 export function teamKey(side) { return side === 'B' ? 'teamB' : 'teamA'; }
 export function otherSide(side) { return side === 'A' ? 'B' : 'A'; }
 
-function cleanRoster(roster, fallbackPrefix) {
-  const list = Array.isArray(roster) ? roster.map(x => String(x || '').trim()).filter(Boolean) : [];
-  return list.length ? list : defaultRoster(fallbackPrefix);
+function cleanRoster(roster) {
+  return Array.isArray(roster) ? [...new Set(roster.map(x => String(x || '').trim()).filter(Boolean))].slice(0, 40) : [];
 }
+
+function makeMatchId() { return `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 
 export function createInitialState(options = {}) {
   const sport = options.sport || 'volleyball';
@@ -30,8 +29,8 @@ export function createInitialState(options = {}) {
   const minutes = Number(options.periodMinutes ?? def.defaultMinutes ?? 0);
   const teamA = { ...clone(DEFAULT_TEAMS.A), ...(options.teamA || {}) };
   const teamB = { ...clone(DEFAULT_TEAMS.B), ...(options.teamB || {}) };
-  teamA.roster = cleanRoster(teamA.roster, 'Home Player');
-  teamB.roster = cleanRoster(teamB.roster, 'Away Player');
+  teamA.roster = cleanRoster(teamA.roster);
+  teamB.roster = cleanRoster(teamB.roster);
 
   const battingFirst = options.battingTeam || 'A';
   const fieldingFirst = otherSide(battingFirst);
@@ -40,6 +39,8 @@ export function createInitialState(options = {}) {
 
   return {
     version: 2,
+    matchId: options.matchId || makeMatchId(),
+    startedAt: Number(options.startedAt || Date.now()),
     sport,
     teamA,
     teamB,

@@ -5,6 +5,7 @@ import {
   badmintonPoint, cricketAction, setCricketRole, switchCricketInnings, advancePeriod,
   formatOvers, swapSides
 } from '../sports.js';
+import { createTeamProfile, upsertTeamProfile, profilesForSport, removeTeamProfile, hasMatchActivity, matchContext } from '../journal.js';
 
 test('simple score never goes below zero', () => {
   let s = createInitialState({ sport: 'basketball' });
@@ -149,4 +150,35 @@ test('cricket run out does not credit bowler wicket', () => {
   s = cricketAction(s, 'runOut');
   assert.equal(s.teamA.wickets, 1);
   assert.equal(s.cricket.bowlingStats.B.B1.wickets, 0);
+});
+
+
+test('new matches start without fake roster names', () => {
+  const s = createInitialState({ sport: 'volleyball' });
+  assert.deepEqual(s.teamA.roster, []);
+  assert.deepEqual(s.teamB.roster, []);
+  assert.equal(s.version, 2);
+  assert.ok(s.matchId);
+});
+
+test('favorite team profiles are sport-aware and reusable', () => {
+  let profiles = [];
+  const volleyball = createTeamProfile({ name: 'Bees', color: '#123456', roster: ['A','B','A'] }, 'volleyball', 'bees-vb');
+  const basketball = createTeamProfile({ name: 'Bees', color: '#123456', roster: ['C'] }, 'basketball', 'bees-bb');
+  profiles = upsertTeamProfile(profiles, volleyball);
+  profiles = upsertTeamProfile(profiles, basketball);
+  assert.deepEqual(profilesForSport(profiles, 'volleyball')[0].roster, ['A','B']);
+  profiles = removeTeamProfile(profiles, 'bees-vb');
+  assert.equal(profilesForSport(profiles, 'volleyball').length, 0);
+  assert.equal(profilesForSport(profiles, 'basketball').length, 1);
+});
+
+test('match journal context captures volleyball score and set', () => {
+  let s = createInitialState({ sport: 'volleyball', teamA: { name: 'Bees' }, teamB: { name: 'Royals' } });
+  s.teamA.score = 18; s.teamB.score = 16; s.period = 2;
+  const ctx = matchContext(s);
+  assert.equal(ctx.title, 'Bees vs Royals');
+  assert.equal(ctx.score, '18-16');
+  assert.match(ctx.detail, /Set 2/);
+  assert.equal(hasMatchActivity(s), true);
 });
