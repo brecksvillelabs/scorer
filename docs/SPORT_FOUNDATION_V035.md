@@ -13,6 +13,8 @@ Scorer uses separate sport-rule review passes followed by one PM/UX consolidatio
 - Field baseline follows the World Lacrosse four-quarter model; the international men's field rulebook uses four 15-minute periods.
 - Optional **Sixes** discipline uses four 8-minute running-time quarters and a 30-second shot clock.
 - Field shot-clock use varies by discipline/competition. World Lacrosse men's international field adopts an 80-second shot clock from 2026; women's field implementation begins in 2027. Scorer therefore keeps the field shot clock configurable rather than assuming it is universal for youth/domestic games.
+- Field Quick Score starts each half with two team timeouts; Sixes starts each half with one.
+- After a Sixes goal, possession moves to the team that conceded for the goalkeeper restart. Field possession remains manual because the game restarts with a faceoff/draw.
 
 ### Quick Score hierarchy
 1. Game clock / quarter
@@ -42,7 +44,8 @@ Scorer uses separate sport-rule review passes followed by one PM/UX consolidatio
 - Seven players on court.
 - Standard senior men's match: two 20-minute halves with a 5-minute interval; shorter competition profiles can be configured.
 - A normal opponent-out / successful tackle is one point.
-- **All Out** adds two extra points in addition to points earned during the raid.
+- **All Out** adds two extra points for whichever team puts the entire opposing side out; it is not inherently a raider-only award.
+- Each team starts each half with two timeouts.
 - Raid ownership and the raid clock are first-class scoreboard information.
 
 ### Quick Score hierarchy
@@ -56,12 +59,16 @@ Scorer uses separate sport-rule review passes followed by one PM/UX consolidatio
 For the current raiding team:
 - Touch +1
 - Bonus +1
-- All Out +2
 
 For the defending team:
-- Tackle +1
+- Tackle +1 and end raid
 
-Touch, bonus and All Out points can accumulate during the same raid. **End raid** or **Empty raid** explicitly hands the next raid to the other team; a successful defending **Tackle +1** scores for the defense and ends the raid. Technical +1 and manual score correction remain available in the match tools.
+For either team:
+- All Out +2
+- Technical +1
+- Manual score correction
+
+Touch and bonus points can accumulate during the same raid. **End raid** or **Empty raid** explicitly hands the next raid to the other team; a successful defending **Tackle +1** scores for the defense and ends the raid. All Out is a separate team-specific +2 control so a defense that completes an All Out can receive the correct bonus too.
 
 ### Future Advanced mode
 - Players in/out and revival order
@@ -78,8 +85,8 @@ Both sports append ordered local events to the existing match event trail so Sco
 v0.3.5 remains local-first. Adding these sports does not upload scores, rosters, media or event data.
 
 ## Rules sources reviewed
-- World Lacrosse Playing Rules and men's field rules for the four-period field baseline.
-- World Lacrosse Sixes rules for 8-minute quarters and the 30-second shot clock.
-- International Kabaddi Federation rules for match timing, standard scoring and the two-point All Out bonus.
+- World Lacrosse Playing Rules and men's field rules for the four-period field baseline and two team timeouts per half.
+- World Lacrosse Sixes rules for 8-minute quarters, the 30-second shot clock, one timeout per half and goalkeeper restart after a goal.
+- International Kabaddi Federation rules for match timing, standard scoring, two timeouts per half, second-half first raid and the two-point All Out bonus.
 
 Competition and youth rules can differ, which is why Scorer exposes timing/shot-clock configuration instead of silently hard-coding every competition to one profile.
