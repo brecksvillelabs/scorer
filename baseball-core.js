@@ -78,8 +78,10 @@ export function createBaseballState(options = {}, baseCreateInitialState) {
     bases: { first: false, second: false, third: false },
     matchWinner: null
   };
-  inningSlot(next, 'A');
-  inningSlot(next, 'B');
+  // Only the half-inning currently in progress receives a 0. Future/unplayed
+  // halves remain null so the line score can show a neutral dot instead of a
+  // misleading zero.
+  inningSlot(next, firstBat);
   next.updatedAt = Date.now();
   return next;
 }
@@ -235,6 +237,7 @@ export function advanceBaseballHalf(state, reason = 'manual') {
     }
     b.half = 'bottom';
     b.battingTeam = home;
+    inningSlot(next, home);
   } else {
     if (b.inning >= b.regulationInnings && next.teamA.score !== next.teamB.score) {
       const winner = next.teamA.score > next.teamB.score ? 'A' : 'B';
@@ -246,8 +249,7 @@ export function advanceBaseballHalf(state, reason = 'manual') {
     next.period = b.inning;
     b.half = 'top';
     b.battingTeam = b.firstBat;
-    inningSlot(next, 'A');
-    inningSlot(next, 'B');
+    inningSlot(next, b.firstBat);
   }
   resetHalf(next);
   appendEvent(next, 'baseball.half_started', { inning: b.inning, half: b.half, battingTeam: b.battingTeam });
