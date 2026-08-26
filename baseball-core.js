@@ -142,6 +142,7 @@ function addOut(next, reason = 'out') {
   b.outs = Math.min(3, Number(b.outs || 0) + 1);
   resetCount(next);
   appendEvent(next, 'baseball.out', { side: b.battingTeam, reason, outs: b.outs, inning: b.inning, half: b.half });
+  next.updatedAt = Date.now();
   if (b.outs >= 3) return advanceBaseballHalf(next, 'three-outs');
   return next;
 }
@@ -171,6 +172,7 @@ function awardFirstBase(next, reason) {
     const away = otherSide(home);
     if (next[teamKey(home)].score > next[teamKey(away)].score) finish(next, home, 'walkoff');
   }
+  next.updatedAt = Date.now();
   return next;
 }
 
