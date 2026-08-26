@@ -2,6 +2,7 @@ import { formatClock, formatOvers, formatTennisPoint, getPeriodText, otherSide, 
 
 const DB_NAME = 'scorer-media-v1';
 const STORE = 'photos';
+const MAX_ORIGINAL_FALLBACK_BYTES = 15 * 1024 * 1024;
 
 export function createTeamProfile(team, sport, id = '') {
   return {
@@ -82,7 +83,7 @@ export function matchSummary(state) {
 
 function openDb() {
   return new Promise((resolve, reject) => {
-    if (!('indexedDB' in globalThis)) return reject(new Error('IndexedDB unavailable'));
+    if (!('indexedDB' in globalThis)) return reject(new Error('Photo storage is unavailable in this browser'));
     const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -92,69 +93,167 @@ function openDb() {
         store.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error || new Error('Could not open media database'));
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+    req.onerror = () => reject(req.error || new Error('Could not open photo storage'));
+    req.onblocked = () => reject(new Error('Photo storage is busy. Close other Scorer tabs and try again.'));
   });
 }
 
-async function withStore(mode, fn) {
+function originalFallback(file) {
+  if (file.size > MAX_ORIGINAL_FALLBACK_BYTES) throw new Error('This photo is too large to save. Try a smaller image or screenshot.');
+  return file.slice(0, file.size, file.type || 'image/jpeg');
+}
+
+async function decodeBitmap(file) {
+  if (!('createImageBitmap' in globalThis)) return null;
+  try { return await createImageBitmap(file); }
+  catch { return null; }
+}
+
+async function decodeHtmlImage(file) {
+  if (typeof Image === 'undefined' || typeof URL === 'undefined') return null;
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Could not decode photo'));
+      img.src = url;
+    });
+    return { image, url };
+  } catch {
+    URL.revokeObjectURL(url);
+    return null;
+  }
+}
+
+async function canvasBlob(canvas) {
+  return await new Promise(resolve => {
+    try { canvas.toBlob(blob => resolve(blob || null), 'image/jpeg', .82); }
+    catch { resolve(null); }
+  });
+}
+
+async function compressImage(file) {
+  if (!file || !String(file.type || '').startsWith('image/')) throw new Error('Choose a photo or image file');
+
+  let source = await decodeBitmap(file);
+  let html = null;
+  if (!source) {
+    html = await decodeHtmlImage(file);
+    source = html?.image || null;
+  }
+  if (!source) return originalFallback(file);
+
+  try {
+    const sw = source.width || source.naturalWidth;
+    const sh = source.height || source.naturalHeight;
+    if (!sw || !sh || typeof document === 'undefined') return originalFallback(file);
+    const max = 1600;
+    const scale = Math.min(1, max / Math.max(sw, sh));
+    const width = Math.max(1, Math.round(sw * scale));
+    const height = Math.max(1, Math.round(sh * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { alpha: false }) || canvas.getContext('2d');
+    if (!ctx) return originalFallback(file);
+    ctx.drawImage(source, 0, 0, width, height);
+    return (await canvasBlob(canvas)) || originalFallback(file);
+  } catch {
+    return originalFallback(file);
+  } finally {
+    source?.close?.();
+    if (html?.url) URL.revokeObjectURL(html.url);
+  }
+}
+
+async function putPhoto(item) {
   const db = await openDb();
   try {
-    return await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, mode);
-      const store = tx.objectStore(STORE);
-      let value;
-      try { value = fn(store, resolve, reject); } catch (e) { reject(e); }
-      tx.oncomplete = () => { if (value !== undefined) resolve(value); };
-      tx.onerror = () => reject(tx.error || new Error('Media database error'));
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const req = tx.objectStore(STORE).put(item);
+      req.onerror = () => reject(req.error || new Error('Could not write photo'));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('Could not save photo'));
+      tx.onabort = () => reject(tx.error || new Error('Photo save was interrupted'));
     });
   } finally { db.close(); }
 }
 
-async function compressImage(file) {
-  if (!file?.type?.startsWith('image/')) throw new Error('Choose an image');
-  let source;
-  let revoke = '';
-  if ('createImageBitmap' in globalThis) source = await createImageBitmap(file);
-  else {
-    revoke = URL.createObjectURL(file);
-    source = await new Promise((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error('Could not read photo')); img.src = revoke; });
-  }
-  const max = 1600;
-  const sw = source.width || source.naturalWidth, sh = source.height || source.naturalHeight;
-  const scale = Math.min(1, max / Math.max(sw, sh));
-  const width = Math.max(1, Math.round(sw * scale));
-  const height = Math.max(1, Math.round(sh * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width; canvas.height = height;
-  const ctx = canvas.getContext('2d', { alpha: false });
-  ctx.drawImage(source, 0, 0, width, height);
-  source.close?.(); if (revoke) URL.revokeObjectURL(revoke);
-  return await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not prepare photo')), 'image/jpeg', .82));
-}
-
 export async function addMatchPhoto(matchId, file, context, caption = '') {
+  if (!matchId) throw new Error('Start or resume a match before adding photos');
   const blob = await compressImage(file);
   const item = {
     id: `photo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     matchId,
     blob,
+    mimeType: blob.type || file.type || 'image/jpeg',
     caption: String(caption || '').trim().slice(0, 180),
-    context,
+    context: context ? structuredCloneSafe(context) : {},
     createdAt: Date.now()
   };
-  await withStore('readwrite', (store) => store.put(item));
+  await putPhoto(item);
   return item;
 }
 
+function structuredCloneSafe(value) {
+  try { return structuredClone(value); }
+  catch { return JSON.parse(JSON.stringify(value ?? {})); }
+}
+
 export async function listMatchPhotos(matchId) {
-  return await withStore('readonly', (store, resolve, reject) => {
-    const req = store.index('matchId').getAll(IDBKeyRange.only(matchId));
-    req.onsuccess = () => resolve((req.result || []).sort((a,b) => a.createdAt - b.createdAt));
-    req.onerror = () => reject(req.error);
-  });
+  const db = await openDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).index('matchId').getAll(IDBKeyRange.only(matchId));
+      req.onsuccess = () => resolve((req.result || []).sort((a,b) => a.createdAt - b.createdAt));
+      req.onerror = () => reject(req.error || new Error('Could not load match photos'));
+      tx.onerror = () => reject(tx.error || new Error('Could not read photo storage'));
+    });
+  } finally { db.close(); }
 }
 
 export async function deleteMatchPhoto(id) {
-  await withStore('readwrite', (store) => store.delete(id));
+  const db = await openDb();
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('Could not delete photo'));
+      tx.onabort = () => reject(tx.error || new Error('Photo deletion was interrupted'));
+    });
+  } finally { db.close(); }
+}
+
+export async function deleteMatchPhotos(matchId) {
+  if (!matchId) return 0;
+  const db = await openDb();
+  let count = 0;
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      const req = store.index('matchId').openKeyCursor(IDBKeyRange.only(matchId));
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        store.delete(cursor.primaryKey);
+        count += 1;
+        cursor.continue();
+      };
+      req.onerror = () => reject(req.error || new Error('Could not find match photos'));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('Could not delete match album'));
+      tx.onabort = () => reject(tx.error || new Error('Album deletion was interrupted'));
+    });
+    return count;
+  } finally { db.close(); }
 }
