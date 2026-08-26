@@ -1,0 +1,51 @@
+name: Assemble Scorer v0.3
+
+on:
+  push:
+    branches:
+      - v0.3-team-library-journal
+
+permissions:
+  contents: write
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v0.3-team-library-journal
+          fetch-depth: 0
+
+      - name: Assemble and validate v0.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -d .v03-payload2 ]; then
+            echo "Corrected payload already assembled; nothing to do."
+            exit 0
+          fi
+          cat .v03-payload2/part*.b64 > /tmp/v03.b64
+          base64 -d /tmp/v03.b64 > /tmp/v03.tgz
+          tar -xzf /tmp/v03.tgz
+          rm -rf .v03-payload .v03-payload2
+          node --version
+          npm run check
+
+      - name: Commit assembled v0.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d .v03-payload2 ]; then
+            echo "Assembly did not complete."
+            exit 1
+          fi
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No assembled changes to commit."
+            exit 0
+          fi
+          git config user.name "brecksvillelabs"
+          git config user.email "brecksvillelabs@gmail.com"
+          git add -A
+          git commit -m "Scorer v0.3 team library and game journal [assembled]"
+          git push origin HEAD:v0.3-team-library-journal
