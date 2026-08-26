@@ -1,30 +1,42 @@
-# Scoreboard Studio
+# Scorer
 
-A mobile-first, installable multi-sport scoreboard for coaches, players, parents, school teams, pickup games and small tournaments.
+Scorer is a mobile-first, installable multi-sport scoreboard from Brecksville Labs. Version 0.2 replaces the original generic two-column approach with sport-specific scoreboards designed around what a coach, scorer, player or spectator actually needs to see.
 
-## Supported sports
+## Sports
 
-- **Volleyball** — rally scoring, sets won, serving indicator, best-of-3 / best-of-5, regular and deciding-set targets, win-by margin.
-- **Basketball** — +1 / +2 / +3 scoring, four quarters, countdown clock, team fouls.
-- **Soccer** — goals, two halves, count-up clock, yellow/red card counters.
-- **American football** — touchdown, field goal, PAT, two-point conversion and safety scoring; four quarters; possession and down/distance.
-- **Cricket** — runs, wickets, legal balls, overs, wides, no-balls, first/second innings and chase target; T20, ODI and custom overs.
+- Volleyball
+- Basketball
+- Soccer
+- American football
+- Cricket
+- Tennis
+- Badminton
 
-## Live-game UX
+## v0.2 highlights
 
-- Large one-tap scoring controls
-- Team names, colors and uploaded logos
-- Undo last action
-- Swap team sides
-- Full-screen spectator/display mode
-- Screen Wake Lock when supported
-- Automatic local save and recovery after refresh/restart
-- Offline PWA support
-- Keyboard shortcuts: `Space` clock start/pause, `F` display mode, `Ctrl/Cmd+Z` undo
+- Dedicated cricket scorecard with the batting team as the visual hero
+- Current striker/non-striker, runs, balls, boundaries and strike rate
+- Current bowler, overs, runs, wickets and economy
+- Roster entry by hand or import from `.txt` / `.csv`
+- Tennis point/game/set scoring with deuce, advantage and 6-6 tie-break behavior
+- Badminton rally scoring, games, server and service-court indicator
+- Sport-specific control panels instead of forcing every sport into the same template
+- Responsive score typography to prevent mobile overflow
+- Full-screen display mode, undo, side swap, local recovery and offline PWA support
+
+## Rules references used for the templates
+
+- World Tennis / ITF Rules of Tennis: https://www.itftennis.com/en/about-us/governance/rules-and-regulations/
+- BWF Laws of Badminton: https://corporate.bwfbadminton.com/statutes/
+- ICC Playing Conditions: https://www.icc-cricket.com/about/cricket/rules-and-regulations/playing-conditions
+- FIVB Official Volleyball Rules: https://www.fivb.com/volleyball/the-game/official-volleyball-rules/
+- NBA Rule No. 5, Scoring and Timing: https://official.nba.com/rule-no-5-scoring-and-timing/
+- IFAB Laws of the Game: https://www.theifab.com/laws/latest/
+- NFL Football Operations rulebook: https://operations.nfl.com/the-rules/nfl-rulebook/
+
+Competition formats vary by league and age group, so Scorer keeps core scoring behavior correct while leaving common period/set/overs settings configurable.
 
 ## Run locally
-
-This is a static app with no runtime dependencies. For service-worker/PWA behavior, serve the folder over HTTP rather than opening `index.html` directly.
 
 ```bash
 python -m http.server 8080
@@ -37,27 +49,11 @@ Open `http://localhost:8080`.
 Requires Node.js 20+.
 
 ```bash
-npm test
 npm run check
 ```
 
-## GitHub Pages
+The v0.2 regression suite covers volleyball set logic, tennis deuce/advantage and tie-break entry, badminton deuce/cap behavior, cricket batter/bowler records and innings handling, basketball quarter foul reset and side swapping.
 
-The included Pages workflow deploys the static project from `main`. In the repository settings, set **Pages → Source** to **GitHub Actions** once, then pushes to `main` deploy automatically.
+## Deployment
 
-## Design principle
-
-The app intentionally separates **sport scoring rules** from **competition-format settings**. League, school, club and youth formats can differ, so the scoreboard uses sensible defaults while keeping period lengths, set format and cricket overs configurable.
-
-## Roadmap ideas
-
-- Game history with export/share summary
-- Remote-controller mode (phone controls a tablet/TV scoreboard)
-- Optional sound/buzzer and end-of-period horn
-- Tournament mode with saved team profiles/logos
-- Volleyball rotation/timeout/substitution tracking
-- Basketball possession arrow and timeout counters
-- Soccer stoppage-time and penalty shootout mode
-- Football timeout counters and configurable down/distance presets
-- Cricket extras breakdown, striker/bowler names and scorecard export
-- OBS/browser-source display URL for streaming
+GitHub Actions runs CI and deploys `main` to GitHub Pages.
