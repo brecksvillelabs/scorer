@@ -1,278 +1,290 @@
 import {
-  SPORT_DEFS, createInitialState, clone, applySimpleScore, volleyballPoint,
-  cricketAction, switchCricketInnings, advancePeriod, tickClock, swapSides,
-  formatClock, formatOvers, getDisplayScore, getPeriodText
+  SPORT_DEFS, createInitialState, clone, applySimpleScore, volleyballPoint, tennisPoint, formatTennisPoint,
+  badmintonPoint, cricketAction, setCricketRole, switchCricketInnings, advancePeriod, tickClock, swapSides,
+  formatClock, formatOvers, strikeRate, economy, getPeriodText, teamKey, otherSide
 } from './sports.js';
 
-const STORAGE_KEY = 'scorer-state-v1';
-const $ = (id) => document.getElementById(id);
+const STORAGE_KEY = 'scorer-state-v2';
+const $ = id => document.getElementById(id);
 let state = null;
 let history = [];
 let selectedSport = 'volleyball';
 let pendingLogos = { A: '', B: '' };
 let editingExisting = false;
-let toastTimer = null;
 let wakeLock = null;
+let toastTimer = null;
 
 const el = {
-  appShell: $('appShell'), sportPill: $('sportPill'), periodText: $('periodText'),
-  clockBlock: $('clockBlock'), clockBtn: $('clockBtn'), saveStatus: $('saveStatus'),
-  teamCardA: $('teamCardA'), teamCardB: $('teamCardB'), accentA: $('accentA'), accentB: $('accentB'),
-  logoWrapA: $('logoWrapA'), logoWrapB: $('logoWrapB'), teamNameA: $('teamNameA'), teamNameB: $('teamNameB'),
-  teamMetaA: $('teamMetaA'), teamMetaB: $('teamMetaB'), scoreA: $('scoreA'), scoreB: $('scoreB'),
-  serveA: $('serveA'), serveB: $('serveB'), controlsA: $('controlsA'), controlsB: $('controlsB'),
-  centerPanel: $('centerPanel'), flowButtons: $('flowButtons'), sportTools: $('sportTools'), sportToolsTitle: $('sportToolsTitle'),
-  undoBtn: $('undoBtn'), swapBtn: $('swapBtn'), editBtn: $('editBtn'), displayBtn: $('displayBtn'), exitDisplayBtn: $('exitDisplayBtn'),
+  appShell: $('appShell'), sportPill: $('sportPill'), periodText: $('periodText'), clockBtn: $('clockBtn'), saveStatus: $('saveStatus'),
+  gameSurface: $('gameSurface'), sportTools: $('sportTools'), undoBtn: $('undoBtn'), swapBtn: $('swapBtn'), editBtn: $('editBtn'), displayBtn: $('displayBtn'), exitDisplayBtn: $('exitDisplayBtn'),
   setupModal: $('setupModal'), closeSetupBtn: $('closeSetupBtn'), sportGrid: $('sportGrid'), sportSettings: $('sportSettings'),
   inputNameA: $('inputNameA'), inputNameB: $('inputNameB'), inputColorA: $('inputColorA'), inputColorB: $('inputColorB'),
   inputLogoA: $('inputLogoA'), inputLogoB: $('inputLogoB'), logoPreviewA: $('logoPreviewA'), logoPreviewB: $('logoPreviewB'),
+  inputRosterA: $('inputRosterA'), inputRosterB: $('inputRosterB'), inputRosterFileA: $('inputRosterFileA'), inputRosterFileB: $('inputRosterFileB'),
   resetSavedBtn: $('resetSavedBtn'), startGameBtn: $('startGameBtn'), toast: $('toast')
 };
 
 function boot() {
-  buildSportChoices();
-  bindEvents();
+  buildSportChoices(); bindEvents();
   const saved = loadState();
-  if (saved && SPORT_DEFS[saved.sport]) {
-    state = saved;
-    selectedSport = state.sport;
-    pendingLogos = { A: state.teamA.logo || '', B: state.teamB.logo || '' };
-    closeSetup();
+  if (saved && saved.version === 2 && SPORT_DEFS[saved.sport]) {
+    state = saved; selectedSport = state.sport; pendingLogos = { A: state.teamA.logo || '', B: state.teamB.logo || '' }; closeSetup();
   } else {
-    state = createInitialState({ sport: selectedSport });
-    renderSportSettings();
-    openSetup(false);
+    state = createInitialState({ sport: selectedSport }); renderSportSettings(); openSetup(false);
   }
-  render();
-  setInterval(clockTick, 1000);
+  render(); setInterval(clockTick, 1000);
   if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 
 function bindEvents() {
   el.undoBtn.addEventListener('click', undo);
-  el.swapBtn.addEventListener('click', () => pushCommit(swapSides(state), 'Teams swapped'));
+  el.swapBtn.addEventListener('click', () => pushCommit(swapSides(state), 'Sides swapped'));
   el.editBtn.addEventListener('click', () => { hydrateSetup(); openSetup(true); });
-  el.displayBtn.addEventListener('click', toggleDisplay);
-  el.exitDisplayBtn.addEventListener('click', toggleDisplay);
-  el.clockBtn.addEventListener('click', toggleClock);
-  el.closeSetupBtn.addEventListener('click', closeSetup);
-  el.startGameBtn.addEventListener('click', startFromSetup);
-  el.resetSavedBtn.addEventListener('click', clearSaved);
-  el.inputLogoA.addEventListener('change', (e) => loadLogo(e, 'A'));
-  el.inputLogoB.addEventListener('change', (e) => loadLogo(e, 'B'));
-  el.inputNameA.addEventListener('input', () => renderLogoPreview('A'));
-  el.inputNameB.addEventListener('input', () => renderLogoPreview('B'));
-  document.addEventListener('keydown', (e) => {
+  el.displayBtn.addEventListener('click', toggleDisplay); el.exitDisplayBtn.addEventListener('click', toggleDisplay);
+  el.clockBtn.addEventListener('click', toggleClock); el.closeSetupBtn.addEventListener('click', closeSetup);
+  el.startGameBtn.addEventListener('click', startFromSetup); el.resetSavedBtn.addEventListener('click', newMatch);
+  el.inputLogoA.addEventListener('change', e => loadLogo(e, 'A')); el.inputLogoB.addEventListener('change', e => loadLogo(e, 'B'));
+  el.inputNameA.addEventListener('input', () => renderLogoPreview('A')); el.inputNameB.addEventListener('input', () => renderLogoPreview('B'));
+  el.inputRosterFileA.addEventListener('change', e => importRoster(e, 'A')); el.inputRosterFileB.addEventListener('change', e => importRoster(e, 'B'));
+  el.gameSurface.addEventListener('click', handleActionClick); el.sportTools.addEventListener('click', handleActionClick);
+  el.sportTools.addEventListener('change', handleRoleChange);
+  document.addEventListener('keydown', e => {
     if (e.target?.matches('input,select,textarea')) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
-    if (e.code === 'Space') { e.preventDefault(); toggleClock(); }
+    if (e.code === 'Space' && SPORT_DEFS[state?.sport]?.hasClock) { e.preventDefault(); toggleClock(); }
     if (e.key.toLowerCase() === 'f') toggleDisplay();
   });
 }
 
 function buildSportChoices() {
   el.sportGrid.innerHTML = '';
-  Object.values(SPORT_DEFS).forEach((sport) => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'sport-choice'; b.dataset.sport = sport.id;
+  Object.values(SPORT_DEFS).forEach(sport => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sport-choice'; b.dataset.sport = sport.id;
     b.innerHTML = `<span class="sport-icon">${sport.icon}</span><strong>${sport.name}</strong>`;
-    b.addEventListener('click', () => {
-      selectedSport = sport.id;
-      document.querySelectorAll('.sport-choice').forEach(x => x.classList.toggle('active', x.dataset.sport === selectedSport));
-      renderSportSettings();
-    });
+    b.addEventListener('click', () => { selectedSport = sport.id; updateSportChoice(); renderSportSettings(); });
     el.sportGrid.appendChild(b);
   });
+  updateSportChoice();
 }
+function updateSportChoice() { document.querySelectorAll('.sport-choice').forEach(x => x.classList.toggle('active', x.dataset.sport === selectedSport)); }
 
 function renderSportSettings() {
-  document.querySelectorAll('.sport-choice').forEach(x => x.classList.toggle('active', x.dataset.sport === selectedSport));
-  let body = `<label class="section-label">${SPORT_DEFS[selectedSport].name} settings</label><div class="sport-settings-grid">`;
-  if (selectedSport === 'volleyball') body += `
+  updateSportChoice(); const s = selectedSport;
+  let body = `<label class="section-label">${SPORT_DEFS[s].name} format</label><div class="sport-settings-grid">`;
+  if (s === 'volleyball') body += `
     <label>Match format<select id="settingBestOf"><option value="3">Best of 3</option><option value="5" selected>Best of 5</option></select></label>
     <label>Regular set to<input id="settingSetTo" type="number" min="1" value="25"></label>
     <label>Deciding set to<input id="settingDecidingSetTo" type="number" min="1" value="15"></label>
     <label>Win by<input id="settingWinBy" type="number" min="1" value="2"></label>`;
-  if (['basketball','soccer','football'].includes(selectedSport)) {
-    const mins = selectedSport === 'basketball' ? 10 : selectedSport === 'soccer' ? 45 : 15;
+  if (['basketball','soccer','football'].includes(s)) {
+    const mins = s === 'basketball' ? 10 : s === 'soccer' ? 45 : 15;
     body += `<label>Period length (minutes)<input id="settingMinutes" type="number" min="1" max="90" value="${mins}"></label>`;
   }
-  if (selectedSport === 'cricket') body += `
+  if (s === 'cricket') body += `
     <label>Format<select id="settingCricketFormat"><option value="T20">T20</option><option value="ODI">ODI</option><option value="Custom">Custom</option></select></label>
     <label>Overs per innings<input id="settingOvers" type="number" min="1" max="500" value="20"></label>
-    <label>Batting first<select id="settingBatting"><option value="A">Home</option><option value="B">Away</option></select></label>`;
-  body += `<div class="setting-note">Sport-specific scoring stays simple enough to operate from the sideline. Undo is always available for accidental taps.</div></div>`;
+    <label>Batting first<select id="settingBatting"><option value="A">Side A</option><option value="B">Side B</option></select></label>`;
+  if (s === 'tennis') body += `<label>Match format<select id="settingTennisBestOf"><option value="3" selected>Best of 3 sets</option><option value="5">Best of 5 sets</option></select></label>`;
+  if (s === 'badminton') body += `<label>Match format<select id="settingBadmintonBestOf"><option value="3" selected>Best of 3 games</option></select></label><label>Game to<input id="settingBadmintonGameTo" type="number" value="21" min="1" max="30"></label>`;
+  body += `<div class="setting-note">Roster fields accept one name per line or pasted CSV names. Cricket uses those rosters for active batters and bowlers; racket sports can use player or doubles-pair names.</div></div>`;
   el.sportSettings.innerHTML = body;
-  $('settingCricketFormat')?.addEventListener('change', (e) => {
-    if (e.target.value === 'T20') $('settingOvers').value = 20;
-    if (e.target.value === 'ODI') $('settingOvers').value = 50;
-  });
+  $('settingCricketFormat')?.addEventListener('change', e => { if (e.target.value === 'T20') $('settingOvers').value = 20; if (e.target.value === 'ODI') $('settingOvers').value = 50; });
 }
 
-function openSetup(editing = false) {
-  editingExisting = editing;
-  el.startGameBtn.textContent = editing ? 'Apply changes' : 'Start scoreboard';
-  el.setupModal.classList.remove('hidden');
-  el.setupModal.setAttribute('aria-hidden', 'false');
-}
-function closeSetup() { el.setupModal.classList.add('hidden'); el.setupModal.setAttribute('aria-hidden', 'true'); }
+function openSetup(editing = false) { editingExisting = editing; el.startGameBtn.textContent = editing ? 'Apply changes' : 'Start scoreboard'; el.setupModal.classList.remove('hidden'); el.setupModal.setAttribute('aria-hidden','false'); }
+function closeSetup() { el.setupModal.classList.add('hidden'); el.setupModal.setAttribute('aria-hidden','true'); }
 
 function hydrateSetup() {
-  selectedSport = state.sport;
-  el.inputNameA.value = state.teamA.name; el.inputNameB.value = state.teamB.name;
-  el.inputColorA.value = state.teamA.color; el.inputColorB.value = state.teamB.color;
-  pendingLogos = { A: state.teamA.logo || '', B: state.teamB.logo || '' };
-  renderSportSettings(); renderLogoPreview('A'); renderLogoPreview('B');
+  selectedSport = state.sport; updateSportChoice();
+  for (const side of ['A','B']) {
+    const t = state[teamKey(side)];
+    $(`inputName${side}`).value = t.name; $(`inputColor${side}`).value = t.color; $(`inputRoster${side}`).value = (t.roster || []).join('\n'); pendingLogos[side] = t.logo || ''; renderLogoPreview(side);
+  }
+  renderSportSettings();
   setTimeout(() => {
     if ($('settingBestOf')) $('settingBestOf').value = state.volleyball.bestOf;
     if ($('settingSetTo')) $('settingSetTo').value = state.volleyball.setTo;
     if ($('settingDecidingSetTo')) $('settingDecidingSetTo').value = state.volleyball.decidingSetTo;
     if ($('settingWinBy')) $('settingWinBy').value = state.volleyball.winBy;
     if ($('settingMinutes')) $('settingMinutes').value = Math.round(state.clock.periodSeconds / 60);
-    if ($('settingOvers')) $('settingOvers').value = state.cricket.oversLimit;
     if ($('settingCricketFormat')) $('settingCricketFormat').value = state.cricket.format;
+    if ($('settingOvers')) $('settingOvers').value = state.cricket.oversLimit;
     if ($('settingBatting')) $('settingBatting').value = state.cricket.battingTeam;
-  }, 0);
+    if ($('settingTennisBestOf')) $('settingTennisBestOf').value = state.tennis.bestOf;
+    if ($('settingBadmintonBestOf')) $('settingBadmintonBestOf').value = state.badminton.bestOf;
+    if ($('settingBadmintonGameTo')) $('settingBadmintonGameTo').value = state.badminton.gameTo;
+  },0);
 }
 
 function startFromSetup() {
   const opts = {
-    sport: selectedSport,
-    teamA: { name: el.inputNameA.value.trim() || 'Home', color: el.inputColorA.value, logo: pendingLogos.A },
-    teamB: { name: el.inputNameB.value.trim() || 'Away', color: el.inputColorB.value, logo: pendingLogos.B },
-    bestOf: Number($('settingBestOf')?.value || 5), setTo: Number($('settingSetTo')?.value || 25),
-    decidingSetTo: Number($('settingDecidingSetTo')?.value || 15), winBy: Number($('settingWinBy')?.value || 2),
-    periodMinutes: Number($('settingMinutes')?.value || 10), cricketFormat: $('settingCricketFormat')?.value || 'T20',
-    oversLimit: Number($('settingOvers')?.value || 20), battingTeam: $('settingBatting')?.value || 'A'
+    sport:selectedSport,
+    teamA:{ name:el.inputNameA.value.trim() || 'Home', color:el.inputColorA.value, logo:pendingLogos.A, roster:parseRosterText(el.inputRosterA.value) },
+    teamB:{ name:el.inputNameB.value.trim() || 'Away', color:el.inputColorB.value, logo:pendingLogos.B, roster:parseRosterText(el.inputRosterB.value) },
+    bestOf:Number($('settingBestOf')?.value || 5), setTo:Number($('settingSetTo')?.value || 25), decidingSetTo:Number($('settingDecidingSetTo')?.value || 15), winBy:Number($('settingWinBy')?.value || 2),
+    periodMinutes:Number($('settingMinutes')?.value || 10), cricketFormat:$('settingCricketFormat')?.value || 'T20', oversLimit:Number($('settingOvers')?.value || 20), battingTeam:$('settingBatting')?.value || 'A',
+    tennisBestOf:Number($('settingTennisBestOf')?.value || 3), badmintonBestOf:Number($('settingBadmintonBestOf')?.value || 3), badmintonGameTo:Number($('settingBadmintonGameTo')?.value || 21)
   };
   if (editingExisting && selectedSport === state.sport) {
-    const n = clone(state);
-    Object.assign(n.teamA, opts.teamA); Object.assign(n.teamB, opts.teamB);
-    if (selectedSport === 'volleyball') Object.assign(n.volleyball, { bestOf: opts.bestOf, setTo: opts.setTo, decidingSetTo: opts.decidingSetTo, winBy: opts.winBy });
+    const n = clone(state); Object.assign(n.teamA, opts.teamA); Object.assign(n.teamB, opts.teamB);
+    if (selectedSport === 'volleyball') Object.assign(n.volleyball,{bestOf:opts.bestOf,setTo:opts.setTo,decidingSetTo:opts.decidingSetTo,winBy:opts.winBy});
     if (['basketball','soccer','football'].includes(selectedSport)) { n.clock.periodSeconds = opts.periodMinutes * 60; n.clock.targetSeconds = opts.periodMinutes * 60; }
-    if (selectedSport === 'cricket') { n.cricket.format = opts.cricketFormat; n.cricket.oversLimit = opts.oversLimit; }
-    pushCommit(n, 'Match settings updated');
-  } else {
-    history = []; state = createInitialState(opts); save(); render(); toast(`${SPORT_DEFS[selectedSport].name} scoreboard ready`);
-  }
-  editingExisting = false; closeSetup();
+    if (selectedSport === 'cricket') { n.cricket.format=opts.cricketFormat; n.cricket.oversLimit=opts.oversLimit; }
+    if (selectedSport === 'tennis') n.tennis.bestOf=opts.tennisBestOf;
+    if (selectedSport === 'badminton') { n.badminton.bestOf=opts.badmintonBestOf; n.badminton.gameTo=opts.badmintonGameTo; }
+    pushCommit(n,'Match settings updated');
+  } else { history=[]; state=createInitialState(opts); save(); render(); toast(`${SPORT_DEFS[selectedSport].name} ready`); }
+  editingExisting=false; closeSetup();
 }
 
 function render() {
-  if (!state) return;
-  const def = SPORT_DEFS[state.sport];
-  el.sportPill.textContent = `${def.icon} ${def.name}`;
-  el.periodText.textContent = getPeriodText(state);
-  el.clockBlock.classList.toggle('hidden', !def.hasClock);
-  el.clockBtn.textContent = formatClock(state.clock.seconds);
-  el.teamNameA.textContent = state.teamA.name; el.teamNameB.textContent = state.teamB.name;
-  el.scoreA.textContent = getDisplayScore(state, 'A'); el.scoreB.textContent = getDisplayScore(state, 'B');
-  paintTeam('A'); paintTeam('B'); renderMeta(); renderQuick('A'); renderQuick('B'); renderCenter(); renderFlow(); renderTools();
-  el.undoBtn.disabled = history.length === 0;
+  if (!state) return; const def=SPORT_DEFS[state.sport];
+  el.sportPill.textContent=`${def.icon} ${def.name}`; el.periodText.textContent=getPeriodText(state); el.clockBtn.classList.toggle('hidden',!def.hasClock); el.clockBtn.textContent=formatClock(state.clock.seconds);
+  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else renderTeamSport();
+  renderTools(); el.undoBtn.disabled=history.length===0; el.saveStatus.textContent='Saved';
 }
 
-function paintTeam(side) {
-  const t = side === 'A' ? state.teamA : state.teamB;
-  const card = side === 'A' ? el.teamCardA : el.teamCardB;
-  const accent = side === 'A' ? el.accentA : el.accentB;
-  const logo = side === 'A' ? el.logoWrapA : el.logoWrapB;
-  card.style.setProperty('--team-color', t.color); accent.style.background = t.color;
-  logo.innerHTML = t.logo ? `<img alt="${esc(t.name)} logo" src="${t.logo}">` : `<span class="logo-fallback">${esc((t.name || '?')[0].toUpperCase())}</span>`;
+function renderTeamSport() {
+  const sport=state.sport;
+  el.gameSurface.innerHTML=`<div class="board dual-board">
+    ${teamCard('A', teamMeta('A'), actionButtons('A'))}
+    ${teamCard('B', teamMeta('B'), actionButtons('B'))}
+    <div class="center-banner">${centerStatus()}</div>
+  </div>`;
+}
+function teamCard(side,meta,buttons) {
+  const t=state[teamKey(side)]; const logo=t.logo?`<img src="${t.logo}" alt="">`:esc((t.name||'?')[0].toUpperCase());
+  return `<section class="team-card" style="--team-color:${safeColor(t.color)}"><div class="team-head"><div class="team-logo">${logo}</div><div style="min-width:0"><div class="team-name">${esc(t.name)}</div><div class="team-sub">${meta}</div></div></div><div class="score-big">${t.score}</div><div class="score-actions">${buttons}</div><div class="small-stats">${teamChips(side)}</div></section>`;
+}
+function actionButtons(side) {
+  const sport=state.sport;
+  const defs = sport==='volleyball' ? [['+1','volleyball-point',1,true],['−1','volleyball-point',-1,false]] :
+    sport==='basketball' ? [['+1 FT','simple',1,false],['+2','simple',2,true],['+3','simple',3,true],['−1','simple',-1,false]] :
+    sport==='soccer' ? [['+ Goal','simple',1,true],['− Goal','simple',-1,false]] :
+    [['TD +6','simple',6,true],['FG +3','simple',3,true],['2PT +2','simple',2,false],['PAT +1','simple',1,false],['Safety +2','simple',2,false],['−1','simple',-1,false]];
+  return defs.map(([label,action,delta,primary])=>`<button class="score-btn ${primary?'primary':''}" style="--team-color:${safeColor(state[teamKey(side)].color)}" data-action="${action}" data-side="${side}" data-delta="${delta}">${label}</button>`).join('');
+}
+function teamMeta(side) {
+  const t=state[teamKey(side)];
+  if(state.sport==='volleyball')return `${t.sets} sets won`;
+  if(state.sport==='basketball')return `${t.fouls} team fouls`;
+  if(state.sport==='soccer')return `${t.yellows} yellow · ${t.reds} red`;
+  if(state.sport==='football')return state.football.possession===side?'Possession':'Defense'; return '';
+}
+function teamChips(side) {
+  if(state.sport==='volleyball')return `${state.volleyball.servingTeam===side?'<span class="stat-chip serve-chip">Serving</span>':''}<span class="stat-chip">${state.volleyball.timeouts[side]} TO left</span>`;
+  if(state.sport==='basketball')return `${state.basketball.possession===side?'<span class="stat-chip serve-chip">Possession</span>':''}<span class="stat-chip">${state.basketball.timeouts[side]} TO</span>`;
+  if(state.sport==='football')return `${state.football.possession===side?'<span class="stat-chip serve-chip">Ball</span>':''}<span class="stat-chip">${state.football.timeouts[side]} TO</span>`; return '';
+}
+function centerStatus(){
+  if(state.finished)return `<strong>${winnerText()}</strong>`;
+  if(state.sport==='volleyball')return `<strong>${state.teamA.sets}–${state.teamB.sets} sets</strong><span>${getPeriodText(state)}</span>`;
+  if(state.sport==='football')return `<strong>${ordinal(state.football.down)} & ${state.football.distance}</strong><span>${esc(state[state.football.possession==='A'?'teamA':'teamB'].name)} ball</span>`;
+  return `<strong>${state.clock.running?'Clock running':'Ready'}</strong><span>${getPeriodText(state)}</span>`;
 }
 
-function renderMeta() {
-  if (state.sport === 'volleyball') {
-    el.teamMetaA.textContent = `${state.teamA.sets} set${state.teamA.sets === 1 ? '' : 's'}`;
-    el.teamMetaB.textContent = `${state.teamB.sets} set${state.teamB.sets === 1 ? '' : 's'}`;
-    el.serveA.classList.toggle('hidden', state.volleyball.servingTeam !== 'A'); el.serveB.classList.toggle('hidden', state.volleyball.servingTeam !== 'B');
-  } else if (state.sport === 'cricket') {
-    el.teamMetaA.textContent = `${formatOvers(state.teamA.balls)} overs`; el.teamMetaB.textContent = `${formatOvers(state.teamB.balls)} overs`;
-    el.serveA.classList.add('hidden'); el.serveB.classList.add('hidden');
-  } else {
-    el.teamMetaA.textContent = state.sport === 'basketball' ? `${state.teamA.fouls} team fouls` : state.sport === 'soccer' ? `${state.teamA.yellows} YC • ${state.teamA.reds} RC` : '';
-    el.teamMetaB.textContent = state.sport === 'basketball' ? `${state.teamB.fouls} team fouls` : state.sport === 'soccer' ? `${state.teamB.yellows} YC • ${state.teamB.reds} RC` : '';
-    el.serveA.classList.add('hidden'); el.serveB.classList.add('hidden');
-  }
+function renderTennis(){
+  const t=state.tennis;
+  el.gameSurface.innerHTML=`<section class="racket-board"><div class="racket-head"><div><div class="racket-title">Match scoreboard</div><div class="racket-note">${t.tiebreak?'Tie-break in progress':`Best of ${t.bestOf} sets`}</div></div><div class="history-row">${t.setHistory.map(h=>`<span class="history-pill">${h.scoreA}-${h.scoreB}</span>`).join('')}</div></div>
+    <div class="racket-grid-head"><span>Player / team</span><span>Sets</span><span>Games</span><span>Point</span></div>
+    ${racketRow('A',t.sets.A,t.games.A,formatTennisPoint(state,'A'),t.servingTeam==='A')}${racketRow('B',t.sets.B,t.games.B,formatTennisPoint(state,'B'),t.servingTeam==='B')}
+    <div class="racket-controls"><button class="racket-score-btn a" data-action="tennis-point" data-side="A">Point · ${esc(state.teamA.name)}</button><button class="racket-score-btn b" data-action="tennis-point" data-side="B">Point · ${esc(state.teamB.name)}</button></div></section>`;
+}
+function renderBadminton(){
+  const b=state.badminton;
+  el.gameSurface.innerHTML=`<section class="racket-board"><div class="racket-head"><div><div class="racket-title">Rally scoreboard</div><div class="racket-note">Best of ${b.bestOf} · game to ${b.gameTo} · win by 2, cap 30</div></div><div class="history-row">${b.gameHistory.map(h=>`<span class="history-pill">${h.scoreA}-${h.scoreB}</span>`).join('')}</div></div>
+    <div class="racket-grid-head"><span>Player / team</span><span>Games</span><span>Court</span><span>Points</span></div>
+    ${racketRow('A',b.games.A,b.servingTeam==='A'?(b.points.A%2===0?'R':'L'):'—',b.points.A,b.servingTeam==='A')}${racketRow('B',b.games.B,b.servingTeam==='B'?(b.points.B%2===0?'R':'L'):'—',b.points.B,b.servingTeam==='B')}
+    <div class="racket-controls"><button class="racket-score-btn a" data-action="badminton-point" data-side="A">Rally · ${esc(state.teamA.name)}</button><button class="racket-score-btn b" data-action="badminton-point" data-side="B">Rally · ${esc(state.teamB.name)}</button></div></section>`;
+}
+function racketRow(side,col1,col2,point,serving){
+  const t=state[teamKey(side)]; const roster=(t.roster||[]).slice(0,2).join(' / ');
+  return `<div class="racket-row"><div class="racket-player">${serving?'<span class="serve-dot"></span>':'<span style="width:10px"></span>'}<div style="min-width:0"><div class="racket-name">${esc(t.name)}</div><div class="team-sub">${esc(roster)}</div></div></div><div class="racket-cell">${col1}</div><div class="racket-cell">${col2}</div><div class="racket-cell racket-point">${point}</div></div>`;
 }
 
-function renderQuick(side) {
-  const host = side === 'A' ? el.controlsA : el.controlsB; host.innerHTML = '';
-  if (state.sport === 'cricket') {
-    if (state.cricket.battingTeam !== side || state.cricket.inningsComplete || state.finished) return;
-    ['0','1','2','3','4','6','wicket','wide','noBall'].forEach(id => addScoreBtn(host, id === 'wicket' ? 'Wicket' : id === 'wide' ? 'Wide' : id === 'noBall' ? 'No-ball' : id, () => pushCommit(cricketAction(state,id), cricketMsg(id)), ['4','6'].includes(id)));
-    return;
-  }
-  SPORT_DEFS[state.sport].controls.forEach(c => addScoreBtn(host, c.label, () => {
-    const next = state.sport === 'volleyball' ? volleyballPoint(state, side, c.delta) : applySimpleScore(state, side, c.delta);
-    pushCommit(next, `${side === 'A' ? state.teamA.name : state.teamB.name}: ${c.label}`);
-  }, c.delta > 0));
+function renderCricket(){
+  const c=state.cricket, batSide=c.battingTeam, fieldSide=otherSide(batSide), bat=state[teamKey(batSide)], field=state[teamKey(fieldSide)];
+  const striker=c.battingStats[batSide][c.striker]||{name:c.striker,runs:0,balls:0,fours:0,sixes:0}; const non=c.battingStats[batSide][c.nonStriker]||{name:c.nonStriker,runs:0,balls:0,fours:0,sixes:0}; const bowl=c.bowlingStats[fieldSide][c.bowler]||{name:c.bowler,balls:0,runs:0,wickets:0};
+  const rr=bat.balls?(bat.runs/(bat.balls/6)).toFixed(2):'0.00'; const ballsLeft=Math.max(0,c.oversLimit*6-bat.balls); const need=c.target?Math.max(0,c.target-bat.runs):null; const req=c.target&&ballsLeft?((need)/(ballsLeft/6)).toFixed(2):null;
+  const battingLogo=bat.logo?`<img src="${bat.logo}" alt="">`:esc((bat.name||'?')[0]);
+  el.gameSurface.innerHTML=`<div class="cricket-board">
+    <section class="cricket-hero" style="--bat-color:${safeColor(bat.color)}"><div class="cricket-topline"><div class="cricket-team"><div class="team-logo">${battingLogo}</div><div><div class="team-name">${esc(bat.name)}</div><div class="cricket-badge">BATTING · ${getPeriodText(state).toUpperCase()}</div></div></div><div class="team-sub">vs ${esc(field.name)}</div></div>
+      <div class="cricket-scoreline"><div class="cricket-score">${bat.runs}/${bat.wickets}</div><div class="cricket-overs">${formatOvers(bat.balls)} overs</div></div>
+      <div class="cricket-context"><span class="stat-chip">Run rate ${rr}</span>${c.target?`<span class="stat-chip">Target ${c.target}</span><span class="stat-chip">Need ${need} from ${ballsLeft}</span>${req?`<span class="stat-chip">Req ${req}</span>`:''}`:''}<span class="stat-chip">Extras ${c.extras[batSide].wides+c.extras[batSide].noBalls}</span></div>
+    </section>
+    <div class="cricket-detail-grid"><section class="scorecard"><div class="scorecard-title">Batting partnership</div><table class="score-table"><thead><tr><th>Batter</th><th>R</th><th>B</th><th>4</th><th>6</th><th>SR</th></tr></thead><tbody>${batterRow(striker,true)}${batterRow(non,false)}</tbody></table></section>
+      <section class="scorecard"><div class="scorecard-title">Current bowler</div><table class="score-table"><thead><tr><th>Bowler</th><th>O</th><th>R</th><th>W</th><th>Eco</th></tr></thead><tbody><tr><td class="active-name">${esc(bowl.name)}</td><td>${formatOvers(bowl.balls)}</td><td>${bowl.runs}</td><td>${bowl.wickets}</td><td>${economy(bowl.runs,bowl.balls)}</td></tr></tbody></table></section></div>
+    <section class="scorecard"><div class="scorecard-title">Score this delivery</div><div class="cricket-pad">${['0','1','2','3','4','6'].map(x=>`<button class="score-btn ${['4','6'].includes(x)?'boundary':''}" data-action="cricket" data-value="${x}">${x}</button>`).join('')}<button class="score-btn danger" data-action="cricket" data-value="wicket">Wicket</button><button class="score-btn danger" data-action="cricket" data-value="runOut">Run out</button><button class="score-btn" data-action="cricket" data-value="wide">Wide</button><button class="score-btn" data-action="cricket" data-value="noBall">No-ball</button></div></section>
+    <div class="innings-summary"><span>${c.innings===1?'First innings':'Chase'} · ${c.format}</span><span>${field.runs||field.balls?`${esc(field.name)} ${field.runs}/${field.wickets} (${formatOvers(field.balls)})`: `${esc(field.name)} fielding`}</span></div>
+  </div>`;
 }
+function batterRow(p,striker){return `<tr><td class="active-name">${esc(p.name)}${striker?'<span class="striker-star">★</span>':''}</td><td>${p.runs}</td><td>${p.balls}</td><td>${p.fours}</td><td>${p.sixes}</td><td>${strikeRate(p.runs,p.balls)}</td></tr>`;}
 
-function addScoreBtn(host, label, fn, primary = false) {
-  const b = document.createElement('button'); b.type = 'button'; b.className = `score-btn${primary ? ' primary-score' : ''}`; b.textContent = label; b.addEventListener('click', fn); host.appendChild(b);
+function renderTools(){
+  const s=state.sport;
+  if(s==='cricket'){ const c=state.cricket,batSide=c.battingTeam,fieldSide=otherSide(batSide),bat=state[teamKey(batSide)],field=state[teamKey(fieldSide)];
+    el.sportTools.innerHTML=`<div class="tool-panel">${c.needsBowler?'<div class="bowler-alert">Over complete — select the next bowler before continuing.</div>':''}<div class="role-selects"><label>Striker<select data-role="striker">${options(bat.roster,c.striker)}</select></label><label>Non-striker<select data-role="nonStriker">${options(bat.roster,c.nonStriker)}</select></label><label>Bowler<select data-role="bowler">${options(field.roster,c.bowler)}</select></label></div><div class="tool-row"><button class="tool-btn" data-action="switch-innings">${c.innings===1?'Start 2nd innings':'Finish match'}</button></div></div>`; return; }
+  if(s==='tennis'||s==='badminton'){ const serving=s==='tennis'?state.tennis.servingTeam:state.badminton.servingTeam; el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn ${serving==='A'?'active':''}" data-action="set-server" data-side="A">${esc(state.teamA.name)} serves</button><button class="tool-btn ${serving==='B'?'active':''}" data-action="set-server" data-side="B">${esc(state.teamB.name)} serves</button></div></div>`; return; }
+  const periodBtns = SPORT_DEFS[s].hasClock ? `<button class="tool-btn" data-action="period" data-delta="-1">Previous ${SPORT_DEFS[s].periodLabel}</button><button class="tool-btn" data-action="period" data-delta="1">Next ${SPORT_DEFS[s].periodLabel}</button>` : '';
+  let extras='';
+  if(s==='volleyball') extras=sideTools('Timeout','timeout','volleyball');
+  if(s==='basketball') extras=sideTools('Foul +','foul','basketball')+sideTools('Timeout','timeout','basketball')+possessionTools('basketball');
+  if(s==='soccer') extras=sideTools('Yellow','yellow','soccer')+sideTools('Red','red','soccer');
+  if(s==='football') extras=`<button class="tool-btn" data-action="down" data-delta="-1">Down −</button><button class="tool-btn" data-action="down" data-delta="1">Down +</button><button class="tool-btn" data-action="distance" data-delta="-5">Distance −5</button><button class="tool-btn" data-action="distance" data-delta="5">Distance +5</button>${possessionTools('football')}${sideTools('Timeout','timeout','football')}`;
+  el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row">${periodBtns}${extras}</div></div>`;
 }
+function sideTools(label,action){return `<button class="tool-btn" data-action="${action}" data-side="A">${label} · A</button><button class="tool-btn" data-action="${action}" data-side="B">${label} · B</button>`;}
+function possessionTools(){return `<button class="tool-btn" data-action="possession" data-side="A">A possession</button><button class="tool-btn" data-action="possession" data-side="B">B possession</button>`;}
+function options(list,current){return [...new Set([current,...(list||[])].filter(Boolean))].map(x=>`<option value="${attr(x)}" ${x===current?'selected':''}>${esc(x)}</option>`).join('');}
 
-function renderCenter() {
-  if (state.finished) { el.centerPanel.innerHTML = `<strong>${state.winner === 'tie' ? 'Game tied' : `${esc(state.winner === 'A' ? state.teamA.name : state.teamB.name)} wins`}</strong>`; return; }
-  if (state.sport === 'volleyball') el.centerPanel.innerHTML = `<strong>${state.teamA.sets} – ${state.teamB.sets}</strong><span>Sets</span>`;
-  else if (state.sport === 'cricket') el.centerPanel.innerHTML = `<strong>${state.cricket.innings === 1 ? '1st' : '2nd'} innings</strong><span>${state.cricket.target ? `Target ${state.cricket.target}` : 'Live score'}</span>`;
-  else if (state.sport === 'football') el.centerPanel.innerHTML = `<strong>${state.football.down}${suffix(state.football.down)} & ${state.football.distance}</strong><span>${state.football.possession === 'A' ? esc(state.teamA.name) : esc(state.teamB.name)} ball</span>`;
-  else el.centerPanel.innerHTML = `<strong>${state.clock.running ? 'Clock running' : 'Ready'}</strong><span>${getPeriodText(state)}</span>`;
+function handleActionClick(e){
+  const b=e.target.closest('[data-action]'); if(!b||!state)return; const action=b.dataset.action,side=b.dataset.side,delta=Number(b.dataset.delta||0); let n;
+  if(action==='simple') n=applySimpleScore(state,side,delta);
+  else if(action==='volleyball-point') n=volleyballPoint(state,side,delta);
+  else if(action==='tennis-point') n=tennisPoint(state,side);
+  else if(action==='badminton-point') n=badmintonPoint(state,side);
+  else if(action==='cricket') n=cricketAction(state,b.dataset.value);
+  else if(action==='switch-innings') n=switchCricketInnings(state);
+  else if(action==='period') n=advancePeriod(state,delta);
+  else { n=clone(state); mutateUtility(n,action,side,delta); }
+  pushCommit(n,actionLabel(action,side));
 }
-
-function renderFlow() {
-  el.flowButtons.innerHTML = '';
-  if (state.sport === 'volleyball') {
-    addTool(el.flowButtons, `Serve: ${state.teamA.name}`, () => setServe('A')); addTool(el.flowButtons, `Serve: ${state.teamB.name}`, () => setServe('B'));
-  } else if (state.sport === 'cricket') {
-    addTool(el.flowButtons, state.cricket.innings === 1 ? 'End innings' : 'Finish innings', () => pushCommit(switchCricketInnings(state), 'Innings advanced'));
-  } else {
-    addTool(el.flowButtons, 'Previous period', () => pushCommit(advancePeriod(state,-1), 'Period changed'));
-    addTool(el.flowButtons, state.clock.running ? 'Pause clock' : 'Start clock', toggleClock);
-    addTool(el.flowButtons, 'Next period', () => pushCommit(advancePeriod(state,1), 'Period changed'));
-  }
+function mutateUtility(n,action,side,delta){
+  const key=teamKey(side);
+  if(action==='foul') n[key].fouls=Math.max(0,n[key].fouls+1);
+  if(action==='yellow') n[key].yellows=Math.max(0,n[key].yellows+1);
+  if(action==='red') n[key].reds=Math.max(0,n[key].reds+1);
+  if(action==='timeout'){ const obj=n[n.sport]?.timeouts; if(obj) obj[side]=Math.max(0,obj[side]-1); }
+  if(action==='possession'){ if(n.sport==='football')n.football.possession=side;if(n.sport==='basketball')n.basketball.possession=side; }
+  if(action==='down') n.football.down=Math.min(4,Math.max(1,n.football.down+delta));
+  if(action==='distance') n.football.distance=Math.max(1,n.football.distance+delta);
+  if(action==='set-server'){ if(n.sport==='tennis')n.tennis.servingTeam=side;if(n.sport==='badminton')n.badminton.servingTeam=side; }
+  n.updatedAt=Date.now();
 }
+function handleRoleChange(e){ const role=e.target.dataset.role;if(!role)return;pushCommit(setCricketRole(state,role,e.target.value),`${role} changed`); }
 
-function renderTools() {
-  el.sportTools.innerHTML = '';
-  if (state.sport === 'basketball') {
-    el.sportToolsTitle.textContent = 'Team fouls'; ['A','B'].forEach(s => { addTool(el.sportTools, `${team(s).name} foul +`, () => counter(s,'fouls',1)); addTool(el.sportTools, `${team(s).name} foul −`, () => counter(s,'fouls',-1)); });
-  } else if (state.sport === 'soccer') {
-    el.sportToolsTitle.textContent = 'Cards'; ['A','B'].forEach(s => { addTool(el.sportTools, `${team(s).name} YC +`, () => counter(s,'yellows',1)); addTool(el.sportTools, `${team(s).name} RC +`, () => counter(s,'reds',1)); });
-  } else if (state.sport === 'football') {
-    el.sportToolsTitle.textContent = 'Down & possession';
-    addTool(el.sportTools,'Next down',() => footballChange('down')); addTool(el.sportTools,'1st & 10',() => footballChange('reset')); addTool(el.sportTools,'Distance −1',() => footballChange('minus')); addTool(el.sportTools,'Distance +1',() => footballChange('plus')); addTool(el.sportTools,'Change possession',() => footballChange('possession'));
-  } else if (state.sport === 'volleyball') {
-    el.sportToolsTitle.textContent = 'Set status'; el.sportTools.innerHTML = `<div class="stat-strip"><div class="stat-tile"><span>Home sets</span><strong>${state.teamA.sets}</strong></div><div class="stat-tile"><span>Away sets</span><strong>${state.teamB.sets}</strong></div></div>`;
-  } else {
-    el.sportToolsTitle.textContent = 'Innings status'; const bat = state.cricket.battingTeam === 'A' ? state.teamA : state.teamB;
-    el.sportTools.innerHTML = `<div class="stat-strip"><div class="stat-tile"><span>Batting</span><strong>${esc(bat.name)}</strong></div><div class="stat-tile"><span>Overs</span><strong>${formatOvers(bat.balls)} / ${state.cricket.oversLimit}</strong></div>${state.cricket.target ? `<div class="stat-tile"><span>Target</span><strong>${state.cricket.target}</strong></div>` : ''}</div>`;
-  }
-}
+function toggleClock(){ if(!SPORT_DEFS[state.sport].hasClock)return;const n=clone(state);n.clock.running=!n.clock.running;pushCommit(n,n.clock.running?'Clock started':'Clock paused',false);if(n.clock.running)requestWake(); }
+function clockTick(){ if(!state?.clock?.running)return;state=tickClock(state);save(false);render(); }
+function undo(){ if(!history.length)return;state=history.pop();save();render();toast('Undone'); }
+function pushCommit(next,msg,record=true){ if(!next)return;if(record)history.push(clone(state));state=next;save();render();toast(msg); }
+function save(show=true){ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(show)el.saveStatus.textContent='Saved';}catch{toast('Could not save locally');} }
+function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch{return null;}}
+function newMatch(){ localStorage.removeItem(STORAGE_KEY);history=[];editingExisting=false;selectedSport='volleyball';pendingLogos={A:'',B:''};state=createInitialState({sport:selectedSport});el.inputNameA.value='Home';el.inputNameB.value='Away';el.inputColorA.value='#2563eb';el.inputColorB.value='#e11d48';el.inputRosterA.value='';el.inputRosterB.value='';renderSportSettings();render();toast('New match ready'); }
 
-function addTool(host,label,fn){ const b=document.createElement('button'); b.type='button'; b.className='tool-btn'; b.textContent=label; b.addEventListener('click',fn); host.appendChild(b); }
-function team(side){ return side==='A'?state.teamA:state.teamB; }
-function setServe(side){ const n=clone(state); n.volleyball.servingTeam=side; pushCommit(n,'Serve changed'); }
-function counter(side,field,delta){ const n=clone(state),t=side==='A'?n.teamA:n.teamB; t[field]=Math.max(0,Number(t[field]||0)+delta); pushCommit(n,'Team stat updated'); }
-function footballChange(kind){ const n=clone(state); if(kind==='down')n.football.down=n.football.down>=4?1:n.football.down+1; if(kind==='reset'){n.football.down=1;n.football.distance=10;} if(kind==='minus')n.football.distance=Math.max(1,n.football.distance-1); if(kind==='plus')n.football.distance+=1; if(kind==='possession'){n.football.possession=n.football.possession==='A'?'B':'A';n.football.down=1;n.football.distance=10;} pushCommit(n,'Football status updated'); }
+async function toggleDisplay(){ const entering=!el.appShell.classList.contains('display-mode');el.appShell.classList.toggle('display-mode',entering);el.exitDisplayBtn.classList.toggle('hidden',!entering);if(entering){requestWake();try{await document.documentElement.requestFullscreen?.();}catch{}}else{try{if(document.fullscreenElement)await document.exitFullscreen();}catch{}} }
+async function requestWake(){try{if('wakeLock'in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch{}}
 
-function pushCommit(next,msg){ history.push(clone(state)); if(history.length>60)history.shift(); commit(next,msg); }
-function commit(next,msg){ state=next; save(); render(); if(msg)toast(msg); }
-function undo(){ if(!history.length)return toast('Nothing to undo'); state=history.pop(); state.clock.running=false; save(); render(); toast('Last action undone'); }
-function toggleClock(){ if(!SPORT_DEFS[state.sport].hasClock)return; const n=clone(state); n.clock.running=!n.clock.running; commit(n,n.clock.running?'Clock started':'Clock paused'); }
-function clockTick(){ if(!state?.clock?.running)return; state=tickClock(state); save(false); el.clockBtn.textContent=formatClock(state.clock.seconds); if(!state.clock.running)toast('Period clock expired'); }
+function loadLogo(e,side){const file=e.target.files?.[0];if(!file)return;if(file.size>1.8*1024*1024){toast('Use a logo under 1.8 MB');e.target.value='';return;}const r=new FileReader();r.onload=()=>{pendingLogos[side]=String(r.result);renderLogoPreview(side);};r.readAsDataURL(file);}
+function renderLogoPreview(side){const host=side==='A'?el.logoPreviewA:el.logoPreviewB;const name=(side==='A'?el.inputNameA:el.inputNameB).value||`Side ${side}`;host.innerHTML=pendingLogos[side]?`<img src="${pendingLogos[side]}" alt=""><span>${esc(name)} logo</span>`:`<span>No logo — ${esc(name[0]||side)} will be shown</span>`;}
+function importRoster(e,side){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=()=>{const list=parseRosterText(String(r.result||''));$(side==='A'?'inputRosterA':'inputRosterB').value=list.join('\n');toast(`${list.length} names imported`);};r.readAsText(file);}
+function parseRosterText(text){return [...new Set(String(text||'').split(/[\r\n,;]+/).map(x=>x.trim().replace(/^"|"$/g,'')).filter(Boolean))].slice(0,40);}
 
-async function toggleDisplay(){ const entering=!el.appShell.classList.contains('display-mode'); el.appShell.classList.toggle('display-mode',entering); el.exitDisplayBtn.classList.toggle('hidden',!entering); el.displayBtn.textContent=entering?'Exit display':'Display mode'; if(entering){ try{ if('wakeLock'in navigator)wakeLock=await navigator.wakeLock.request('screen'); }catch{} try{ await document.documentElement.requestFullscreen?.(); }catch{} } else { try{await wakeLock?.release();}catch{} wakeLock=null; try{if(document.fullscreenElement)await document.exitFullscreen();}catch{} } }
-
-function loadLogo(event,side){ const file=event.target.files?.[0]; if(!file)return; if(!/^image\/(png|jpeg|webp)$/.test(file.type))return toast('Use PNG, JPEG or WebP'); if(file.size>1.8*1024*1024)return toast('Logo must be under 1.8 MB'); const r=new FileReader(); r.onload=()=>{pendingLogos[side]=String(r.result);renderLogoPreview(side);}; r.readAsDataURL(file); }
-function renderLogoPreview(side){ const host=side==='A'?el.logoPreviewA:el.logoPreviewB,name=(side==='A'?el.inputNameA.value:el.inputNameB.value)||side; host.innerHTML=pendingLogos[side]?`<img alt="logo preview" src="${pendingLogos[side]}">`:`<span>${esc(name[0].toUpperCase())}</span>`; }
-
-function save(show=true){ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(show)el.saveStatus.textContent='Saved on this device';}catch{toast('Local save failed');} }
-function loadState(){ try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');return s?.sport?s:null;}catch{return null;} }
-function clearSaved(){ localStorage.removeItem(STORAGE_KEY); history=[]; editingExisting=false; pendingLogos={A:'',B:''}; el.inputNameA.value='Home';el.inputNameB.value='Away';el.inputColorA.value='#2563eb';el.inputColorB.value='#e11d48';selectedSport='volleyball';renderSportSettings();renderLogoPreview('A');renderLogoPreview('B');toast('Saved game cleared'); }
-function toast(msg){ clearTimeout(toastTimer);el.toast.textContent=msg;el.toast.classList.add('show');toastTimer=setTimeout(()=>el.toast.classList.remove('show'),1900); }
-function cricketMsg(id){ return id==='0'?'Dot ball':id==='wicket'?'Wicket':id==='wide'?'Wide +1':id==='noBall'?'No-ball +1':`${id} run${id==='1'?'':'s'}`; }
-function suffix(n){return n===1?'st':n===2?'nd':n===3?'rd':'th';}
+function winnerText(){if(state.winner==='tie')return'Match tied';return `${esc(state[teamKey(state.winner)].name)} wins`;}
+function actionLabel(action,side){const name=side?state[teamKey(side)]?.name:'';return side?`${name}: ${action.replaceAll('-',' ')}`:action.replaceAll('-',' ');}
+function ordinal(n){return n===1?'1st':n===2?'2nd':n===3?'3rd':`${n}th`;}
+function safeColor(v){return /^#[0-9a-f]{6}$/i.test(v||'')?v:'#2563eb';}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function attr(v){return esc(v).replace(/`/g,'&#96;');}
+function toast(msg){clearTimeout(toastTimer);el.toast.textContent=msg;el.toast.classList.add('show');toastTimer=setTimeout(()=>el.toast.classList.remove('show'),1600);}
 
 boot();
