@@ -18,7 +18,15 @@ function boot033() {
   repairSavedFoundationState();
   injectStyles();
   decorate();
-  const observer = new MutationObserver(() => requestAnimationFrame(decorate));
+  let scheduled = false;
+  const observer = new MutationObserver(() => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      decorate();
+    });
+  });
   observer.observe(document.body, { childList: true, subtree: true });
   document.addEventListener('click', event => {
     if (event.target.closest('.sport-choice')) setTimeout(decorateRuleNote, 0);
@@ -53,8 +61,8 @@ function decorateCricketControls() {
 
   const strikerRunOut = pad.querySelector('[data-action="cricket"][data-value="runOut"]');
   if (strikerRunOut) {
-    strikerRunOut.textContent = 'Run out ★';
-    strikerRunOut.title = 'Dismiss the striker';
+    if (strikerRunOut.textContent !== 'Run out ★') strikerRunOut.textContent = 'Run out ★';
+    if (strikerRunOut.title !== 'Dismiss the striker') strikerRunOut.title = 'Dismiss the striker';
   }
 
   if (strikerRunOut && !pad.querySelector('[data-value="runOut:nonStriker"]')) {
@@ -66,12 +74,50 @@ function decorateCricketControls() {
     strikerRunOut.insertAdjacentElement('afterend', button);
   }
 
+  ensureFallbackBowlerOptions(state);
+
   const lock = Boolean(state.cricket?.needsBowler);
   pad.querySelectorAll('[data-action="cricket"]').forEach(button => {
-    button.disabled = lock;
-    button.setAttribute('aria-disabled', lock ? 'true' : 'false');
+    if (button.disabled !== lock) button.disabled = lock;
+    const value = lock ? 'true' : 'false';
+    if (button.getAttribute('aria-disabled') !== value) button.setAttribute('aria-disabled', value);
   });
   pad.classList.toggle('v033-pad-locked', lock);
+
+  const alert = document.querySelector('.bowler-alert');
+  if (alert && alert.textContent !== 'Over complete — choose the next bowler to continue.') {
+    alert.textContent = 'Over complete — choose the next bowler to continue.';
+  }
+}
+
+function ensureFallbackBowlerOptions(state) {
+  const select = document.querySelector('select[data-role="bowler"]');
+  if (!select) return;
+
+  const fieldSide = state.cricket.battingTeam === 'A' ? 'B' : 'A';
+  const stats = state.cricket.bowlingStats?.[fieldSide] || {};
+  const roster = state[fieldSide === 'A' ? 'teamA' : 'teamB']?.roster || [];
+  const known = [...new Set([...roster, ...Object.keys(stats), state.cricket.bowler].filter(Boolean))];
+  const existing = new Set([...select.options].map(option => option.value));
+
+  for (const name of known) {
+    if (existing.has(name)) continue;
+    select.add(new Option(name, name));
+    existing.add(name);
+  }
+
+  // When no names were entered, Scorer still needs a valid way to start the
+  // next over. Offer the next generated bowler while retaining earlier
+  // generated bowlers so the scorer can alternate them on later overs.
+  let nextNumber = 1;
+  for (const name of existing) {
+    const match = /^Bowler\s+(\d+)$/i.exec(name);
+    if (match) nextNumber = Math.max(nextNumber, Number(match[1]) + 1);
+  }
+  if (state.cricket.needsBowler) {
+    const fallback = `Bowler ${nextNumber}`;
+    if (!existing.has(fallback)) select.add(new Option(fallback, fallback));
+  }
 }
 
 function decorateRuleNote() {
@@ -88,6 +134,8 @@ function decorateRuleNote() {
     note.className = 'v033-rule-note';
     host.appendChild(note);
   }
+  if (note.dataset.sport === sport) return;
+  note.dataset.sport = sport;
   note.innerHTML = `<span>Rules foundation</span><strong>${escapeHtml(profile.baseline)}</strong><small>Quick scoring stays simple; the underlying match model now preserves richer sport events for Connected Scorer.</small>`;
 }
 
@@ -108,5 +156,5 @@ function injectStyles() {
 }
 
 function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 }
