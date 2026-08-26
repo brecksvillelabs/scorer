@@ -1,171 +1,87 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#08111f" />
-  <meta name="description" content="Scoreboard Studio — a fast, mobile-first multi-sport scoreboard for coaches, players, families and pickup games." />
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css" />
-  <title>Scoreboard Studio</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <title>Scorer</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div class="app-shell" id="appShell">
     <header class="topbar">
       <div class="brand-lockup">
-        <div class="brand-mark" aria-hidden="true">SB</div>
-        <div>
-          <div class="eyebrow">Live game console</div>
-          <h1>Scoreboard Studio</h1>
-        </div>
+        <div class="brand-mark">S</div>
+        <div><div class="eyebrow">BRECKSVILLE LABS</div><h1>Scorer</h1></div>
       </div>
       <div class="top-actions">
-        <button class="icon-btn" id="undoBtn" title="Undo last action" aria-label="Undo last action">↶</button>
-        <button class="icon-btn" id="swapBtn" title="Swap team sides" aria-label="Swap team sides">⇄</button>
-        <button class="icon-btn" id="editBtn" title="Edit match" aria-label="Edit match">⚙</button>
-        <button class="primary compact" id="displayBtn">Display mode</button>
+        <button id="undoBtn" class="icon-btn" type="button" aria-label="Undo">↶</button>
+        <button id="swapBtn" class="icon-btn" type="button" aria-label="Swap sides">⇄</button>
+        <button id="editBtn" class="icon-btn" type="button" aria-label="Game setup">⚙</button>
+        <button id="displayBtn" class="display-btn" type="button">Display</button>
       </div>
     </header>
 
-    <main>
-      <section class="match-ribbon" aria-label="Match status">
-        <div class="sport-pill" id="sportPill">🏐 Volleyball</div>
-        <div class="period-block">
-          <span class="label">Current</span>
-          <strong id="periodText">Set 1</strong>
-        </div>
-        <div class="clock-block" id="clockBlock">
-          <span class="label">Game clock</span>
-          <button class="clock" id="clockBtn" aria-label="Start or pause game clock">10:00</button>
-        </div>
-        <div class="status-block">
-          <span class="status-dot"></span>
-          <span id="saveStatus">Saved on this device</span>
-        </div>
-      </section>
-
-      <section class="scoreboard" aria-label="Scoreboard">
-        <article class="team-card" id="teamCardA">
-          <div class="team-accent" id="accentA"></div>
-          <div class="team-head">
-            <div class="logo-wrap" id="logoWrapA"><span class="logo-fallback">H</span></div>
-            <div class="team-copy">
-              <span class="side-label">HOME</span>
-              <h2 id="teamNameA">Home</h2>
-              <div class="team-meta" id="teamMetaA"></div>
-            </div>
-          </div>
-          <div class="score" id="scoreA">0</div>
-          <div class="serving-badge hidden" id="serveA">● SERVING</div>
-          <div class="quick-controls" id="controlsA"></div>
-        </article>
-
-        <div class="center-stack">
-          <div class="versus">VS</div>
-          <div class="center-panel" id="centerPanel"></div>
-        </div>
-
-        <article class="team-card" id="teamCardB">
-          <div class="team-accent" id="accentB"></div>
-          <div class="team-head">
-            <div class="logo-wrap" id="logoWrapB"><span class="logo-fallback">A</span></div>
-            <div class="team-copy">
-              <span class="side-label">AWAY</span>
-              <h2 id="teamNameB">Away</h2>
-              <div class="team-meta" id="teamMetaB"></div>
-            </div>
-          </div>
-          <div class="score" id="scoreB">0</div>
-          <div class="serving-badge hidden" id="serveB">● SERVING</div>
-          <div class="quick-controls" id="controlsB"></div>
-        </article>
-      </section>
-
-      <section class="control-deck" id="controlDeck">
-        <div class="control-group">
-          <div class="control-heading">
-            <div>
-              <span class="eyebrow">Game flow</span>
-              <h3>Period & clock</h3>
-            </div>
-          </div>
-          <div class="flow-buttons" id="flowButtons"></div>
-        </div>
-
-        <div class="control-group" id="sportToolsGroup">
-          <div class="control-heading">
-            <div>
-              <span class="eyebrow">Sport tools</span>
-              <h3 id="sportToolsTitle">Match controls</h3>
-            </div>
-          </div>
-          <div id="sportTools"></div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="app-footer">
-      <span>Scoreboard Studio v0.1</span>
-      <span>Offline-ready • local-first • no account required</span>
-    </footer>
-  </div>
-
-  <button class="exit-display hidden" id="exitDisplayBtn">Exit display</button>
-
-  <div class="modal-backdrop" id="setupModal" aria-hidden="false">
-    <section class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
-      <div class="modal-header">
-        <div>
-          <span class="eyebrow">New game</span>
-          <h2 id="setupTitle">Set up your scoreboard</h2>
-        </div>
-        <button class="icon-btn" id="closeSetupBtn" aria-label="Close setup">✕</button>
+    <section class="match-strip">
+      <div class="sport-pill" id="sportPill">🏐 Volleyball</div>
+      <div class="match-center">
+        <span class="period-label" id="periodText">Set 1</span>
+        <button id="clockBtn" class="clock hidden" type="button">10:00</button>
       </div>
-
-      <div class="setup-grid">
-        <div class="setup-section full">
-          <label class="section-label">Choose sport</label>
-          <div class="sport-grid" id="sportGrid"></div>
-        </div>
-
-        <div class="setup-section team-setup-card">
-          <div class="setup-team-title">
-            <span>Home team</span>
-            <span class="mini-chip">A</span>
-          </div>
-          <label>Team name<input id="inputNameA" maxlength="30" value="Home" /></label>
-          <div class="two-col">
-            <label>Team color<input id="inputColorA" type="color" value="#2563eb" /></label>
-            <label class="file-label">Team logo<input id="inputLogoA" type="file" accept="image/png,image/jpeg,image/webp" /><span>Choose image</span></label>
-          </div>
-          <div class="logo-preview" id="logoPreviewA"><span>H</span></div>
-        </div>
-
-        <div class="setup-section team-setup-card">
-          <div class="setup-team-title">
-            <span>Away team</span>
-            <span class="mini-chip">B</span>
-          </div>
-          <label>Team name<input id="inputNameB" maxlength="30" value="Away" /></label>
-          <div class="two-col">
-            <label>Team color<input id="inputColorB" type="color" value="#e11d48" /></label>
-            <label class="file-label">Team logo<input id="inputLogoB" type="file" accept="image/png,image/jpeg,image/webp" /><span>Choose image</span></label>
-          </div>
-          <div class="logo-preview" id="logoPreviewB"><span>A</span></div>
-        </div>
-
-        <div class="setup-section full" id="sportSettings"></div>
-      </div>
-
-      <div class="modal-actions">
-        <button class="ghost" id="resetSavedBtn">Clear saved game</button>
-        <button class="primary" id="startGameBtn">Start scoreboard</button>
-      </div>
+      <div class="save-chip" id="saveStatus">Saved</div>
     </section>
+
+    <main id="gameSurface" class="game-surface" aria-live="polite"></main>
+    <section id="sportTools" class="sport-tools"></section>
   </div>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js"></script>
+  <button class="exit-display hidden" id="exitDisplayBtn" type="button">Exit display</button>
+  <div class="toast" id="toast" role="status"></div>
+
+  <div class="modal-backdrop" id="setupModal" aria-hidden="true">
+    <div class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+      <div class="modal-header">
+        <div><div class="eyebrow">MATCH CONTROL</div><h2 id="setupTitle">Set up scoreboard</h2></div>
+        <button id="closeSetupBtn" class="icon-btn" type="button" aria-label="Close setup">✕</button>
+      </div>
+
+      <section class="setup-section">
+        <label class="section-label">Choose sport</label>
+        <div id="sportGrid" class="sport-grid"></div>
+      </section>
+
+      <section class="setup-section team-setup-grid">
+        <div class="team-setup-card">
+          <div class="team-setup-title"><span class="dot dot-a"></span>Side A</div>
+          <label>Team / player name<input id="inputNameA" value="Home" maxlength="40"></label>
+          <label>Color<input id="inputColorA" type="color" value="#2563eb"></label>
+          <label>Logo<input id="inputLogoA" type="file" accept="image/png,image/jpeg,image/webp"></label>
+          <div id="logoPreviewA" class="logo-preview"></div>
+          <label>Roster / player names<textarea id="inputRosterA" rows="6" placeholder="One player per line&#10;Or paste a CSV column"></textarea></label>
+          <label class="file-pick">Import roster (.txt/.csv)<input id="inputRosterFileA" type="file" accept=".txt,.csv,text/plain,text/csv"></label>
+        </div>
+        <div class="team-setup-card">
+          <div class="team-setup-title"><span class="dot dot-b"></span>Side B</div>
+          <label>Team / player name<input id="inputNameB" value="Away" maxlength="40"></label>
+          <label>Color<input id="inputColorB" type="color" value="#e11d48"></label>
+          <label>Logo<input id="inputLogoB" type="file" accept="image/png,image/jpeg,image/webp"></label>
+          <div id="logoPreviewB" class="logo-preview"></div>
+          <label>Roster / player names<textarea id="inputRosterB" rows="6" placeholder="One player per line&#10;Or paste a CSV column"></textarea></label>
+          <label class="file-pick">Import roster (.txt/.csv)<input id="inputRosterFileB" type="file" accept=".txt,.csv,text/plain,text/csv"></label>
+        </div>
+      </section>
+
+      <section id="sportSettings" class="setup-section"></section>
+
+      <div class="modal-footer">
+        <button id="resetSavedBtn" class="secondary-btn" type="button">New match</button>
+        <button id="startGameBtn" class="primary-btn" type="button">Start scoreboard</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
