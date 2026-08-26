@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createInitialState, advancePeriod, tickClock, swapSides } from '../sports.js';
 import {
   EXTRA_SPORT_DEFS, EXTRA_RULE_PROFILES, createScorerState, lacrosseGoal, setLacrossePossession,
-  lacrosseShotClockAction, kabaddiAction, setKabaddiRaid, kabaddiRaidClockAction,
+  lacrosseTimeout, lacrosseShotClockAction, kabaddiAction, setKabaddiRaid, kabaddiRaidClockAction,
   tickScorerClock, advanceScorerPeriod, swapScorerSides, getScorerPeriodText
 } from '../v035-core.js';
 
@@ -21,15 +21,17 @@ test('field lacrosse defaults to four 15-minute quarters without forcing a shot 
   assert.equal(state.clock.seconds, 15 * 60);
   assert.equal(state.lacrosse.discipline, 'field');
   assert.equal(state.lacrosse.shotClockSeconds, 0);
+  assert.equal(state.lacrosse.timeouts.A, 2);
   assert.equal(getScorerPeriodText(state, () => ''), 'Q1');
 });
 
-test('lacrosse Sixes preset uses eight-minute quarters and a 30-second shot clock', () => {
+test('lacrosse Sixes preset uses eight-minute quarters, 30-second shot clock and one timeout per half', () => {
   const state = createScorerState({ sport: 'lacrosse', lacrosseDiscipline: 'sixes', periodMinutes: 8, lacrosseShotClock: 30 }, createInitialState);
   assert.equal(state.clock.seconds, 480);
   assert.equal(state.lacrosse.discipline, 'sixes');
   assert.equal(state.lacrosse.shotClock, 30);
   assert.equal(state.lacrosse.shotClockSeconds, 30);
+  assert.deepEqual(state.lacrosse.timeouts, { A: 1, B: 1 });
 });
 
 test('lacrosse goal and possession actions create sport-specific state and events', () => {
@@ -43,6 +45,28 @@ test('lacrosse goal and possession actions create sport-specific state and event
   state = setLacrossePossession(state, 'B');
   assert.equal(state.lacrosse.possession, 'B');
   assert.equal(state.events.at(-1).type, 'lacrosse.possession');
+});
+
+test('Sixes goal hands the restart possession to the team that conceded', () => {
+  let state = createScorerState({ sport: 'lacrosse', lacrosseDiscipline: 'sixes', lacrosseShotClock: 30, lacrossePossession: 'A' }, createInitialState);
+  state = lacrosseGoal(state, 'A', 1);
+  assert.equal(state.lacrosse.possession, 'B');
+  assert.equal(state.lacrosse.shotClock, 30);
+});
+
+test('lacrosse timeout allowances replenish at halftime using discipline rules', () => {
+  let field = createScorerState({ sport: 'lacrosse' }, createInitialState);
+  field = lacrosseTimeout(field, 'A');
+  field = advanceScorerPeriod(field, 1, advancePeriod);
+  field = advanceScorerPeriod(field, 1, advancePeriod);
+  assert.equal(field.period, 3);
+  assert.deepEqual(field.lacrosse.timeouts, { A: 2, B: 2 });
+
+  let sixes = createScorerState({ sport: 'lacrosse', lacrosseDiscipline: 'sixes', lacrosseShotClock: 30 }, createInitialState);
+  sixes = lacrosseTimeout(sixes, 'A');
+  sixes = advanceScorerPeriod(sixes, 1, advancePeriod);
+  sixes = advanceScorerPeriod(sixes, 1, advancePeriod);
+  assert.deepEqual(sixes.lacrosse.timeouts, { A: 1, B: 1 });
 });
 
 test('kabaddi raid can accumulate multiple touch/bonus points before it ends', () => {
@@ -65,6 +89,16 @@ test('kabaddi All Out adds the separate two-point bonus without prematurely clos
   assert.equal(state.events.at(-1).type, 'kabaddi.all_out_bonus');
 });
 
+test('kabaddi All Out can be awarded to the defending team', () => {
+  let state = createScorerState({ sport: 'kabaddi', kabaddiFirstRaid: 'A' }, createInitialState);
+  state = kabaddiAction(state, 'technical', 'B-allOut');
+  assert.equal(state.teamA.score, 0);
+  assert.equal(state.teamB.score, 2);
+  assert.equal(state.kabaddi.raidPoints, 0);
+  assert.equal(state.events.at(-1).type, 'kabaddi.all_out_bonus');
+  assert.equal(state.events.at(-1).side, 'B');
+});
+
 test('kabaddi tackle awards defense and ends the raid', () => {
   let state = createScorerState({ sport: 'kabaddi', kabaddiFirstRaid: 'A' }, createInitialState);
   state = kabaddiAction(state, 'tackle');
@@ -82,11 +116,13 @@ test('kabaddi empty raid changes raid ownership without changing score', () => {
   assert.equal(state.kabaddi.raidingTeam, 'A');
 });
 
-test('kabaddi second half starts with the team that did not start the first half raid', () => {
+test('kabaddi second half starts with the other first raider and restores two timeouts', () => {
   let state = createScorerState({ sport: 'kabaddi', kabaddiFirstRaid: 'A' }, createInitialState);
+  state.kabaddi.timeouts = { A: 0, B: 1 };
   state = advanceScorerPeriod(state, 1, advancePeriod);
   assert.equal(state.period, 2);
   assert.equal(state.kabaddi.raidingTeam, 'B');
+  assert.deepEqual(state.kabaddi.timeouts, { A: 2, B: 2 });
   assert.equal(getScorerPeriodText(state, () => ''), '2nd Half');
 });
 
