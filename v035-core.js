@@ -25,15 +25,7 @@ function otherSide(side) { return side === 'A' ? 'B' : 'A'; }
 function appendEvent(next, type, details = {}) {
   if (!Array.isArray(next.events)) next.events = [];
   next.eventSeq = Number(next.eventSeq || 0) + 1;
-  next.events.push({
-    id: `${next.matchId || 'match'}-e${next.eventSeq}`,
-    seq: next.eventSeq,
-    type,
-    sport: next.sport,
-    period: next.period,
-    at: Date.now(),
-    ...details
-  });
+  next.events.push({ id: `${next.matchId || 'match'}-e${next.eventSeq}`, seq: next.eventSeq, type, sport: next.sport, period: next.period, at: Date.now(), ...details });
   if (next.events.length > 5000) next.events = next.events.slice(-5000);
 }
 
@@ -96,18 +88,11 @@ export function lacrosseGoal(state, side, delta = 1) {
   if (next.sport !== 'lacrosse' || !next.lacrosse) return next;
   const key = teamKey(side);
   next[key].score = Math.max(0, Number(next[key].score || 0) + Number(delta || 0));
-  appendEvent(next, delta >= 0 ? 'lacrosse.goal' : 'lacrosse.score_corrected', {
-    side,
-    delta: Number(delta || 0),
-    scoreA: next.teamA.score,
-    scoreB: next.teamB.score
-  });
+  appendEvent(next, delta >= 0 ? 'lacrosse.goal' : 'lacrosse.score_corrected', { side, delta: Number(delta || 0), scoreA: next.teamA.score, scoreB: next.teamB.score });
   if (delta > 0 && next.lacrosse.shotClockSeconds > 0) {
     next.lacrosse.shotClock = next.lacrosse.shotClockSeconds;
     next.lacrosse.shotClockRunning = false;
   }
-  // Sixes restarts with the goalkeeper of the team that conceded the goal.
-  // Field lacrosse uses a faceoff/draw, so possession stays manual there.
   if (delta > 0 && next.lacrosse.discipline === 'sixes') next.lacrosse.possession = otherSide(side);
   next.updatedAt = Date.now();
   return next;
@@ -141,9 +126,7 @@ export function lacrosseShotClockAction(state, action) {
   if (action === 'reset') {
     next.lacrosse.shotClock = next.lacrosse.shotClockSeconds;
     next.lacrosse.shotClockRunning = false;
-  } else if (action === 'toggle') {
-    next.lacrosse.shotClockRunning = !next.lacrosse.shotClockRunning;
-  }
+  } else if (action === 'toggle') next.lacrosse.shotClockRunning = !next.lacrosse.shotClockRunning;
   appendEvent(next, 'lacrosse.shot_clock', { action, seconds: next.lacrosse.shotClock });
   next.updatedAt = Date.now();
   return next;
@@ -167,9 +150,7 @@ export function kabaddiRaidClockAction(state, action) {
   if (action === 'reset') {
     next.kabaddi.raidClock = next.kabaddi.raidSeconds;
     next.kabaddi.raidRunning = false;
-  } else if (action === 'toggle') {
-    next.kabaddi.raidRunning = !next.kabaddi.raidRunning;
-  }
+  } else if (action === 'toggle') next.kabaddi.raidRunning = !next.kabaddi.raidRunning;
   appendEvent(next, 'kabaddi.raid_clock', { action, seconds: next.kabaddi.raidClock, raidingTeam: next.kabaddi.raidingTeam });
   next.updatedAt = Date.now();
   return next;
@@ -185,6 +166,12 @@ function finishRaid(next, reason) {
   next.kabaddi.raidPoints = 0;
 }
 
+function parseAwardSide(side, suffix) {
+  const value = String(side || '');
+  const match = new RegExp(`^([AB])-${suffix}$`).exec(value);
+  return match ? match[1] : null;
+}
+
 export function kabaddiAction(state, action, side = null) {
   const next = clone(state);
   if (next.sport !== 'kabaddi' || !next.kabaddi) return next;
@@ -195,21 +182,27 @@ export function kabaddiAction(state, action, side = null) {
     next[teamKey(raidSide)].score += 1;
     next.kabaddi.raidPoints += 1;
     appendEvent(next, action === 'touch' ? 'kabaddi.touch_point' : 'kabaddi.bonus_point', { side: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
-  } else if (action === 'allOut' && ['A','B'].includes(side)) {
-    next[teamKey(side)].score += 2;
-    if (side === raidSide) next.kabaddi.raidPoints += 2;
-    appendEvent(next, 'kabaddi.all_out_bonus', { side, points: 2, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
+  } else if (action === 'allOut') {
+    const awardSide = ['A','B'].includes(side) ? side : raidSide;
+    next[teamKey(awardSide)].score += 2;
+    if (awardSide === raidSide) next.kabaddi.raidPoints += 2;
+    appendEvent(next, 'kabaddi.all_out_bonus', { side: awardSide, points: 2, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
   } else if (action === 'tackle') {
     next[teamKey(defenseSide)].score += 1;
     appendEvent(next, 'kabaddi.tackle_point', { side: defenseSide, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
     finishRaid(next, 'tackle');
-  } else if (action === 'empty') {
-    finishRaid(next, 'empty');
-  } else if (action === 'end') {
-    finishRaid(next, 'completed');
-  } else if (action === 'technical' && ['A','B'].includes(side)) {
-    next[teamKey(side)].score += 1;
-    appendEvent(next, 'kabaddi.technical_point', { side, scoreA: next.teamA.score, scoreB: next.teamB.score });
+  } else if (action === 'empty') finishRaid(next, 'empty');
+  else if (action === 'end') finishRaid(next, 'completed');
+  else if (action === 'technical') {
+    const allOutSide = parseAwardSide(side, 'allOut');
+    if (allOutSide) {
+      next[teamKey(allOutSide)].score += 2;
+      if (allOutSide === raidSide) next.kabaddi.raidPoints += 2;
+      appendEvent(next, 'kabaddi.all_out_bonus', { side: allOutSide, points: 2, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
+    } else if (['A','B'].includes(side)) {
+      next[teamKey(side)].score += 1;
+      appendEvent(next, 'kabaddi.technical_point', { side, scoreA: next.teamA.score, scoreB: next.teamB.score });
+    }
   } else if (action === 'correct' && ['A','B'].includes(side)) {
     next[teamKey(side)].score = Math.max(0, next[teamKey(side)].score - 1);
     appendEvent(next, 'kabaddi.score_corrected', { side, scoreA: next.teamA.score, scoreB: next.teamB.score });
@@ -248,15 +241,15 @@ export function advanceScorerPeriod(state, delta, baseAdvancePeriod) {
     next.lacrosse.shotClock = next.lacrosse.shotClockSeconds;
     next.lacrosse.shotClockRunning = false;
     if (before === 2 && next.period === 3) {
-      const count = Number(next.lacrosse.timeoutsPerHalf ?? (next.lacrosse.discipline === 'sixes' ? 1 : 2));
+      const count = next.lacrosse.discipline === 'sixes' ? 1 : 2;
+      next.lacrosse.timeoutsPerHalf = count;
       next.lacrosse.timeouts = { A: count, B: count };
     }
   }
   if (next.sport === 'kabaddi' && next.kabaddi) {
     if (next.period === 2) {
       next.kabaddi.raidingTeam = otherSide(next.kabaddi.firstHalfStartingRaid);
-      const count = Number(next.kabaddi.timeoutsPerHalf || 2);
-      next.kabaddi.timeouts = { A: count, B: count };
+      next.kabaddi.timeouts = { A: 2, B: 2 };
     }
     next.kabaddi.raidClock = next.kabaddi.raidSeconds;
     next.kabaddi.raidRunning = false;
