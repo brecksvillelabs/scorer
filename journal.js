@@ -1,4 +1,6 @@
 import { formatClock, formatOvers, formatTennisPoint, getPeriodText, otherSide, teamKey } from './sports.js';
+import { getScorerPeriodText } from './v035-core.js';
+import { getBaseballPeriodText } from './baseball-core.js';
 
 const DB_NAME = 'scorer-media-v1';
 const STORE = 'photos';
@@ -38,14 +40,25 @@ export function hasMatchActivity(state) {
   if (state.volleyball?.setHistory?.length || state.tennis?.setHistory?.length || state.badminton?.gameHistory?.length) return true;
   if (state.sport === 'tennis' && (state.tennis?.points?.A || state.tennis?.points?.B || state.tennis?.games?.A || state.tennis?.games?.B)) return true;
   if (state.sport === 'badminton' && (state.badminton?.points?.A || state.badminton?.points?.B)) return true;
+  if (state.sport === 'baseball') {
+    const b = state.baseball;
+    if (b?.half === 'bottom' || b?.balls || b?.strikes || b?.outs || b?.hits?.A || b?.hits?.B || b?.errors?.A || b?.errors?.B || b?.bases?.first || b?.bases?.second || b?.bases?.third) return true;
+  }
   return false;
+}
+
+function sportPeriod(state) {
+  if (state.sport === 'baseball') return getBaseballPeriodText(state);
+  if (state.sport === 'lacrosse' || state.sport === 'kabaddi') return getScorerPeriodText(state, getPeriodText);
+  return getPeriodText(state);
 }
 
 export function matchContext(state) {
   if (!state) return { title: 'Match', detail: '' };
   const a = state.teamA?.name || 'Side A';
   const b = state.teamB?.name || 'Side B';
-  const base = { sport: state.sport, title: `${a} vs ${b}`, period: getPeriodText(state), timestamp: Date.now() };
+  const period = sportPeriod(state);
+  const base = { sport: state.sport, title: `${a} vs ${b}`, period, timestamp: Date.now() };
   if (state.sport === 'cricket') {
     const batSide = state.cricket.battingTeam;
     const bat = state[teamKey(batSide)];
@@ -58,8 +71,27 @@ export function matchContext(state) {
   if (state.sport === 'badminton') {
     return { ...base, score: `${state.badminton.games.A}-${state.badminton.games.B} games`, detail: `${state.badminton.points.A}-${state.badminton.points.B} points` };
   }
+  if (state.sport === 'lacrosse') {
+    const l = state.lacrosse;
+    const possession = state[teamKey(l.possession)]?.name || `Side ${l.possession}`;
+    const shot = l.shotClockSeconds > 0 ? ` · Shot ${l.shotClock}` : '';
+    return { ...base, score: `${state.teamA.score}-${state.teamB.score}`, detail: `${period} · ${formatClock(state.clock.seconds)} · ${possession} possession${shot}` };
+  }
+  if (state.sport === 'kabaddi') {
+    const k = state.kabaddi;
+    const raider = state[teamKey(k.raidingTeam)]?.name || `Side ${k.raidingTeam}`;
+    return { ...base, score: `${state.teamA.score}-${state.teamB.score}`, detail: `${period} · ${formatClock(state.clock.seconds)} · ${raider} raid · ${k.raidClock}s` };
+  }
+  if (state.sport === 'baseball') {
+    const bb = state.baseball;
+    return {
+      ...base,
+      score: `${state.teamA.score}-${state.teamB.score}`,
+      detail: `${period} · B-S-O ${bb.balls}-${bb.strikes}-${bb.outs} · H ${bb.hits.A}-${bb.hits.B} · E ${bb.errors.A}-${bb.errors.B}`
+    };
+  }
   const clock = state.clock?.mode && state.clock.mode !== 'none' ? ` · ${formatClock(state.clock.seconds)}` : '';
-  return { ...base, score: `${state.teamA.score}-${state.teamB.score}`, detail: `${getPeriodText(state)}${clock}` };
+  return { ...base, score: `${state.teamA.score}-${state.teamB.score}`, detail: `${period}${clock}` };
 }
 
 export function matchSummary(state) {
