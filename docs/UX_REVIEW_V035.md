@@ -99,3 +99,7 @@ This reduces hidden UI mutation and makes fan/operator behavior easier to reason
 ## UX release recommendation
 
 Proceed with v0.3.5 once the complete automated suite and branch CI execute successfully. The remaining product ideas—advanced baseball scorebook, player attribution, richer penalties/substitutions, and cloud spectator sync—should not be mixed into this pre-v0.4 release unless QC finds a regression.
+
+## CI retrigger note
+
+GitHub-hosted runners resumed after the review was completed. This documentation-only touch intentionally retriggers the branch CI so the final reviewed v0.3.5 head is validated by the complete automated suite before merge.
