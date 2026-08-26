@@ -42,7 +42,7 @@ Scorer uses separate sport-rule review passes followed by one PM/UX consolidatio
 - Seven players on court.
 - Standard senior men's match: two 20-minute halves with a 5-minute interval; shorter competition profiles can be configured.
 - A normal opponent-out / successful tackle is one point.
-- **All Out** adds two extra points in addition to points from the raid.
+- **All Out** adds two extra points in addition to points earned during the raid.
 - Raid ownership and the raid clock are first-class scoreboard information.
 
 ### Quick Score hierarchy
@@ -57,12 +57,11 @@ For the current raiding team:
 - Touch +1
 - Bonus +1
 - All Out +2
-- Technical +1
 
 For the defending team:
 - Tackle +1
 
-Completing a scoring action ends the current raid and hands the next raid to the other team. An explicit **Empty raid** action changes raid possession without changing the score.
+Touch, bonus and All Out points can accumulate during the same raid. **End raid** or **Empty raid** explicitly hands the next raid to the other team; a successful defending **Tackle +1** scores for the defense and ends the raid. Technical +1 and manual score correction remain available in the match tools.
 
 ### Future Advanced mode
 - Players in/out and revival order
@@ -77,3 +76,10 @@ Both sports append ordered local events to the existing match event trail so Sco
 
 ## Privacy
 v0.3.5 remains local-first. Adding these sports does not upload scores, rosters, media or event data.
+
+## Rules sources reviewed
+- World Lacrosse Playing Rules and men's field rules for the four-period field baseline.
+- World Lacrosse Sixes rules for 8-minute quarters and the 30-second shot clock.
+- International Kabaddi Federation rules for match timing, standard scoring and the two-point All Out bonus.
+
+Competition and youth rules can differ, which is why Scorer exposes timing/shot-clock configuration instead of silently hard-coding every competition to one profile.
