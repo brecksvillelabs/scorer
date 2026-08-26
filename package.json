@@ -1,0 +1,11 @@
+{
+  "name": "scoreboard-studio",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "description": "A mobile-first multi-sport scoreboard PWA for coaches, teams and casual games.",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check app.js && node --check sports.js && node --test"
+  }
+}

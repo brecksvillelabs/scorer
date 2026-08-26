@@ -1,0 +1,12 @@
+{
+  "name": "Scoreboard Studio",
+  "short_name": "Scoreboard",
+  "description": "A fast multi-sport scoreboard for coaches, players, families and pickup games.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#07101d",
+  "theme_color": "#08111f",
+  "icons": [
+    { "src": "assets/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
