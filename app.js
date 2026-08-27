@@ -14,6 +14,7 @@ import {
   advanceBaseballHalf, swapBaseballSides
 } from './baseball-core.js';
 import { baseballSetupMarkup, baseballBoardMarkup, baseballToolsMarkup } from './baseball-ui.js';
+import { changeTimeout, timeoutStatus } from './v037-core.js';
 
 const SPORTS = { ...SPORT_DEFS, ...EXTRA_SPORT_DEFS, baseball: BASEBALL_SPORT_DEF };
 const STORAGE_KEY = 'scorer-state-v2';
@@ -306,21 +307,31 @@ function renderTools(){
   if(s==='tennis'||s==='badminton'){ const serving=s==='tennis'?state.tennis.servingTeam:state.badminton.servingTeam; el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn ${serving==='A'?'active':''}" data-action="set-server" data-side="A">${esc(state.teamA.name)} serves</button><button class="tool-btn ${serving==='B'?'active':''}" data-action="set-server" data-side="B">${esc(state.teamB.name)} serves</button></div></div>`; return; }
   if(s==='lacrosse'){
     const shot=state.lacrosse.shotClockSeconds>0?`<button class="tool-btn" data-action="lacrosse-shot" data-value="toggle">${state.lacrosse.shotClockRunning?'Pause':'Start'} shot clock</button><button class="tool-btn" data-action="lacrosse-shot" data-value="reset">Reset shot ${state.lacrosse.shotClockSeconds}</button>`:'';
-    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Quarter</button><button class="tool-btn" data-action="period" data-delta="1">Next Quarter</button><button class="tool-btn ${state.lacrosse.possession==='A'?'active':''}" data-action="lacrosse-possession" data-side="A">${esc(state.teamA.name)} possession</button><button class="tool-btn ${state.lacrosse.possession==='B'?'active':''}" data-action="lacrosse-possession" data-side="B">${esc(state.teamB.name)} possession</button>${shot}<button class="tool-btn" data-action="lacrosse-timeout" data-side="A">Timeout · A</button><button class="tool-btn" data-action="lacrosse-timeout" data-side="B">Timeout · B</button></div></div>`; return;
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Quarter</button><button class="tool-btn" data-action="period" data-delta="1">Next Quarter</button><button class="tool-btn ${state.lacrosse.possession==='A'?'active':''}" data-action="lacrosse-possession" data-side="A">${esc(state.teamA.name)} possession</button><button class="tool-btn ${state.lacrosse.possession==='B'?'active':''}" data-action="lacrosse-possession" data-side="B">${esc(state.teamB.name)} possession</button>${shot}${timeoutTools()}</div></div>`; return;
   }
   if(s==='kabaddi'){
-    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Half</button><button class="tool-btn" data-action="period" data-delta="1">Next Half</button><button class="tool-btn ${state.kabaddi.raidingTeam==='A'?'active':''}" data-action="kabaddi-set-raid" data-side="A">A raids</button><button class="tool-btn ${state.kabaddi.raidingTeam==='B'?'active':''}" data-action="kabaddi-set-raid" data-side="B">B raids</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="toggle">${state.kabaddi.raidRunning?'Pause':'Start'} raid timer</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="reset">Reset ${state.kabaddi.raidSeconds}s</button><button class="tool-btn" data-action="kabaddi-technical" data-side="A">Technical +1 · A</button><button class="tool-btn" data-action="kabaddi-technical" data-side="B">Technical +1 · B</button><button class="tool-btn" data-action="timeout" data-side="A">Timeout · A</button><button class="tool-btn" data-action="timeout" data-side="B">Timeout · B</button></div></div>`; return;
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Half</button><button class="tool-btn" data-action="period" data-delta="1">Next Half</button><button class="tool-btn ${state.kabaddi.raidingTeam==='A'?'active':''}" data-action="kabaddi-set-raid" data-side="A">A raids</button><button class="tool-btn ${state.kabaddi.raidingTeam==='B'?'active':''}" data-action="kabaddi-set-raid" data-side="B">B raids</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="toggle">${state.kabaddi.raidRunning?'Pause':'Start'} raid timer</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="reset">Reset ${state.kabaddi.raidSeconds}s</button><button class="tool-btn" data-action="kabaddi-technical" data-side="A">Technical +1 · A</button><button class="tool-btn" data-action="kabaddi-technical" data-side="B">Technical +1 · B</button>${timeoutTools()}</div></div>`; return;
   }
   if(s==='baseball'){ el.sportTools.innerHTML=baseballToolsMarkup(state,esc); return; }
   const periodBtns = SPORTS[s].hasClock ? `<button class="tool-btn" data-action="period" data-delta="-1">Previous ${SPORTS[s].periodLabel}</button><button class="tool-btn" data-action="period" data-delta="1">Next ${SPORTS[s].periodLabel}</button>` : '';
   let extras='';
-  if(s==='volleyball') extras=sideTools('Timeout','timeout','volleyball');
-  if(s==='basketball') extras=sideTools('Foul +','foul','basketball')+sideTools('Timeout','timeout','basketball')+possessionTools('basketball');
+  if(s==='volleyball') extras=timeoutTools();
+  if(s==='basketball') extras=sideTools('Foul +','foul','basketball')+timeoutTools()+possessionTools('basketball');
   if(s==='soccer') extras=sideTools('Yellow','yellow','soccer')+sideTools('Red','red','soccer');
-  if(s==='football') extras=`<button class="tool-btn" data-action="down" data-delta="-1">Down −</button><button class="tool-btn" data-action="down" data-delta="1">Down +</button><button class="tool-btn" data-action="distance" data-delta="-5">Distance −5</button><button class="tool-btn" data-action="distance" data-delta="5">Distance +5</button>${possessionTools('football')}${sideTools('Timeout','timeout','football')}`;
+  if(s==='football') extras=`<button class="tool-btn" data-action="down" data-delta="-1">Down −</button><button class="tool-btn" data-action="down" data-delta="1">Down +</button><button class="tool-btn" data-action="distance" data-delta="-5">Distance −5</button><button class="tool-btn" data-action="distance" data-delta="5">Distance +5</button>${possessionTools('football')}${timeoutTools()}`;
   el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row">${periodBtns}${extras}</div></div>`;
 }
 function sideTools(label,action){return `<button class="tool-btn" data-action="${action}" data-side="A">${label} · A</button><button class="tool-btn" data-action="${action}" data-side="B">${label} · B</button>`;}
+function timeoutTools(){
+  const status=timeoutStatus(state);
+  if(!status.limit)return'';
+  return ['A','B'].map(side=>{
+    const remaining=status[side];
+    const take=`<button class="tool-btn" data-action="timeout" data-side="${side}" ${remaining<=0?'disabled':''}>Timeout · ${side} (${remaining})</button>`;
+    const restore=remaining<status.limit?`<button class="tool-btn timeout-recovery" data-action="restore-timeout" data-side="${side}">↶ Restore timeout · ${side}</button>`:'';
+    return take+restore;
+  }).join('');
+}
 function possessionTools(){return `<button class="tool-btn" data-action="possession" data-side="A">A possession</button><button class="tool-btn" data-action="possession" data-side="B">B possession</button>`;}
 function options(list,current){return [...new Set([current,...(list||[])].filter(Boolean))].map(x=>`<option value="${attr(x)}" ${x===current?'selected':''}>${esc(x)}</option>`).join('');}
 
@@ -332,7 +343,8 @@ function handleActionClick(e){
   else if(action==='badminton-point') n=badmintonPoint(state,side);
   else if(action==='lacrosse-goal') n=lacrosseGoal(state,side,delta);
   else if(action==='lacrosse-possession') n=setLacrossePossession(state,side);
-  else if(action==='lacrosse-timeout') n=lacrosseTimeout(state,side);
+  else if(action==='lacrosse-timeout'||action==='timeout') n=changeTimeout(state,side,-1);
+  else if(action==='restore-timeout') n=changeTimeout(state,side,1);
   else if(action==='lacrosse-shot') n=lacrosseShotClockAction(state,b.dataset.value);
   else if(action==='kabaddi') n=kabaddiAction(state,b.dataset.value);
   else if(action==='kabaddi-correct') n=kabaddiAction(state,'correct',side);
@@ -358,7 +370,6 @@ function mutateUtility(n,action,side,delta){
   if(action==='foul') n[key].fouls=Math.max(0,n[key].fouls+1);
   if(action==='yellow') n[key].yellows=Math.max(0,n[key].yellows+1);
   if(action==='red') n[key].reds=Math.max(0,n[key].reds+1);
-  if(action==='timeout'){ const obj=n[n.sport]?.timeouts; if(obj) obj[side]=Math.max(0,obj[side]-1); }
   if(action==='possession'){ if(n.sport==='football')n.football.possession=side;if(n.sport==='basketball')n.basketball.possession=side; }
   if(action==='down') n.football.down=Math.min(4,Math.max(1,n.football.down+delta));
   if(action==='distance') n.football.distance=Math.max(1,n.football.distance+delta);
