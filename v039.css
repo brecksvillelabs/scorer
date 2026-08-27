@@ -101,6 +101,17 @@
 .v039-step-teams .favorite-row select{
   min-height:48px;
 }
+.v039-step-teams .v039-favorite-picker{
+  grid-template-columns:1fr;
+}
+.v039-favorite-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.v039-favorite-actions .mini-btn{
+  flex:1 1 120px;
+}
 .v039-team-more,
 .v039-format-more{
   margin-top:4px;
@@ -111,6 +122,7 @@
 }
 .v039-team-more summary,
 .v039-format-more summary{
+  position:relative;
   list-style:none;
   cursor:pointer;
   min-height:50px;
