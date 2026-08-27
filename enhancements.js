@@ -1,7 +1,7 @@
 import { SPORT_DEFS } from './sports.js';
 import {
   createTeamProfile, upsertTeamProfile, profilesForSport, removeTeamProfile,
-  hasMatchActivity, matchContext, matchSummary, addMatchPhoto, listMatchPhotos, deleteMatchPhoto
+  hasMatchActivity, matchContext, matchSummary, addMatchPhoto, listMatchPhotos, deleteMatchPhoto, recoverMatchPhotos
 } from './journal.js';
 import {
   addMatchNote, listMatchNotes, deleteMatchNote, setMatchNoteHighlighted,
@@ -21,6 +21,8 @@ let history = readJson(HISTORY_KEY, []);
 let viewingMatchId = '';
 let photoUrls = [];
 let lastArchivedSignature = '';
+let cameraStream = null;
+let cameraOrigin = 'quick';
 
 const el = {
   sportGrid: $('sportGrid'),
@@ -31,7 +33,8 @@ const el = {
   startGameBtn: $('startGameBtn'), resetSavedBtn: $('resetSavedBtn'),
   quickCameraBtn: $('quickCameraBtn'), quickPhotoInput: $('quickPhotoInput'),
   journalBtn: $('journalBtn'), journalModal: $('journalModal'), closeJournalBtn: $('closeJournalBtn'), journalMatchCard: $('journalMatchCard'), capturePanel: $('capturePanel'), diarySummary: $('diarySummary'),
-  photoCaption: $('photoCaption'), photoInput: $('photoInput'), saveNoteBtn: $('saveNoteBtn'), momentHighlight: $('momentHighlight'), archiveMatchBtn: $('archiveMatchBtn'), albumGrid: $('albumGrid'), historyList: $('historyList'), toast: $('toast')
+  diaryCameraBtn: $('diaryCameraBtn'), photoCaption: $('photoCaption'), photoInput: $('photoInput'), saveNoteBtn: $('saveNoteBtn'), momentHighlight: $('momentHighlight'), archiveMatchBtn: $('archiveMatchBtn'), albumGrid: $('albumGrid'), historyList: $('historyList'), toast: $('toast'),
+  cameraModal: $('cameraModal'), cameraPreview: $('cameraPreview'), cameraStatus: $('cameraStatus'), cameraCaptureBtn: $('cameraCaptureBtn'), cameraCancelBtn: $('cameraCancelBtn'), cameraFallbackBtn: $('cameraFallbackBtn')
 };
 
 bind();
@@ -71,10 +74,14 @@ function bind() {
     setTimeout(() => { ensureCurrentMatchId(true); renderFavoriteSelects(); }, 0);
   }, true);
 
-  el.quickCameraBtn.addEventListener('click', openQuickCamera);
-  el.quickPhotoInput.addEventListener('change', event => capturePhoto(event, true));
+  el.quickCameraBtn.addEventListener('click', () => openCameraCapture('quick'));
+  el.diaryCameraBtn.addEventListener('click', () => openCameraCapture('diary'));
+  el.quickPhotoInput.addEventListener('change', event => capturePhoto(event, cameraOrigin !== 'diary'));
   el.journalBtn.addEventListener('click', () => openJournal());
   el.closeJournalBtn.addEventListener('click', closeJournal);
+  el.cameraCaptureBtn.addEventListener('click', captureCameraFrame);
+  el.cameraCancelBtn.addEventListener('click', closeCameraCapture);
+  el.cameraFallbackBtn.addEventListener('click', openExternalCameraFallback);
   el.archiveMatchBtn.addEventListener('click', () => {
     const state = normalizedState();
     if (state) { archiveState(state, true); renderJournal(); }
@@ -274,8 +281,16 @@ async function renderJournal() {
   revokeUrls();
   let photos = [];
   let photoLoadError = '';
-  try { photos = await listMatchPhotos(summary.matchId); }
-  catch (error) { photoLoadError = error?.message || 'Could not read saved photos'; }
+  try {
+    photos = await listMatchPhotos(summary.matchId);
+    if (current && photos.length === 0) {
+      const recovered = await recoverMatchPhotos(summary);
+      if (recovered > 0) {
+        photos = await listMatchPhotos(summary.matchId);
+        toast(`Recovered ${recovered} saved photo${recovered === 1 ? '' : 's'}`);
+      }
+    }
+  } catch (error) { photoLoadError = error?.message || 'Could not read saved photos'; }
   const notes = listMatchNotes(summary.matchId);
   const items = mergeDiaryItems(photos, notes, getPhotoHighlights());
   const counts = diaryMomentSummary(items);
@@ -317,12 +332,95 @@ function momentTime(timestamp) {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function openQuickCamera() {
+async function openCameraCapture(origin = 'quick') {
   const state = normalizedState();
   if (!state) return toast('Start or resume a match before taking a photo');
   ensureCurrentMatchId();
+  cameraOrigin = origin === 'diary' ? 'diary' : 'quick';
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return openExternalCameraFallback();
+  }
+
+  closeCameraStream();
+  el.cameraStatus.textContent = 'Starting camera…';
+  el.cameraStatus.classList.remove('ready');
+  el.cameraCaptureBtn.disabled = true;
+  el.cameraModal.classList.remove('hidden');
+  el.cameraModal.setAttribute('aria-hidden','false');
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    });
+    el.cameraPreview.srcObject = cameraStream;
+    await el.cameraPreview.play();
+    el.cameraCaptureBtn.disabled = false;
+    el.cameraStatus.classList.add('ready');
+  } catch (error) {
+    el.cameraStatus.classList.remove('ready');
+    el.cameraStatus.textContent = error?.name === 'NotAllowedError'
+      ? 'Camera permission was denied. You can use the phone camera fallback instead.'
+      : 'Scorer could not start the in-app camera. Use the phone camera fallback.';
+  }
+}
+
+function closeCameraStream() {
+  for (const track of cameraStream?.getTracks?.() || []) track.stop();
+  cameraStream = null;
+  if (el.cameraPreview) el.cameraPreview.srcObject = null;
+}
+
+function closeCameraCapture() {
+  closeCameraStream();
+  el.cameraModal.classList.add('hidden');
+  el.cameraModal.setAttribute('aria-hidden','true');
+  el.cameraCaptureBtn.disabled = true;
+}
+
+function openExternalCameraFallback() {
+  closeCameraCapture();
   el.quickPhotoInput.value = '';
   el.quickPhotoInput.click();
+}
+
+async function captureCameraFrame() {
+  const state = normalizedState();
+  const video = el.cameraPreview;
+  if (!state || !video?.videoWidth || !video?.videoHeight) return toast('Camera is not ready yet');
+
+  try {
+    el.cameraCaptureBtn.disabled = true;
+    const max = 1600;
+    const scale = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const ctx = canvas.getContext('2d', { alpha: false }) || canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not capture camera frame');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .88));
+    if (!blob) throw new Error('Could not create photo');
+
+    const file = typeof File === 'function'
+      ? new File([blob], `scorer-${Date.now()}.jpg`, { type: 'image/jpeg' })
+      : blob;
+    const caption = cameraOrigin === 'diary' ? el.photoCaption.value : '';
+    const highlighted = cameraOrigin === 'diary' ? el.momentHighlight.checked : false;
+    const photo = await addMatchPhoto(state.matchId, file, matchContext(state), caption);
+    if (highlighted) setPhotoHighlighted(photo.id, state.matchId, true);
+    archiveState(state, false);
+    if (cameraOrigin === 'diary') resetMomentComposer();
+    viewingMatchId = state.matchId;
+    closeCameraCapture();
+    if (!el.journalModal.classList.contains('hidden')) await renderJournal();
+    const score = photo.context?.score;
+    toast(`Photo saved${score ? ` · ${score}` : ''}`);
+  } catch (error) {
+    el.cameraCaptureBtn.disabled = false;
+    toast(error?.message || 'Could not save photo');
+  }
 }
 
 async function capturePhoto(event, quick = false) {
