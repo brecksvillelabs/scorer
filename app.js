@@ -67,6 +67,7 @@ function bindEvents() {
   el.inputRosterFileA.addEventListener('change', e => importRoster(e, 'A')); el.inputRosterFileB.addEventListener('change', e => importRoster(e, 'B'));
   el.gameSurface.addEventListener('click', handleActionClick); el.sportTools.addEventListener('click', handleActionClick);
   el.sportTools.addEventListener('change', handleRoleChange);
+  document.addEventListener('scorer:prepare-scheduled-game', event => prepareScheduledGame(event.detail || {}));
   document.addEventListener('keydown', e => {
     if (e.target?.matches('input,select,textarea')) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
@@ -389,6 +390,29 @@ function pushCommit(next,msg,record=true){ if(!next)return;if(record)history.pus
 function save(show=true){ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(show)el.saveStatus.textContent='Saved';}catch{toast('Could not save locally');} }
 function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch{return null;}}
 function newMatch(){ localStorage.removeItem(STORAGE_KEY);history=[];editingExisting=false;selectedSport='volleyball';pendingLogos={A:'',B:''};state=createStateFor({sport:selectedSport});el.inputNameA.value='Home';el.inputNameB.value='Away';el.inputColorA.value='#2563eb';el.inputColorB.value='#e11d48';el.inputRosterA.value='';el.inputRosterB.value='';renderSportSettings();render();toast('New match ready'); }
+
+function prepareScheduledGame(detail={}) {
+  const sport = SPORTS[detail.sport] ? detail.sport : 'volleyball';
+  localStorage.removeItem(STORAGE_KEY);
+  history = [];
+  editingExisting = false;
+  selectedSport = sport;
+  pendingLogos = { A:'', B:'' };
+  state = createStateFor({ sport });
+  el.inputNameA.value = String(detail.teamA || 'Home').slice(0,40);
+  el.inputNameB.value = String(detail.teamB || 'Away').slice(0,40);
+  el.inputColorA.value = '#2563eb';
+  el.inputColorB.value = '#e11d48';
+  el.inputRosterA.value = '';
+  el.inputRosterB.value = '';
+  renderSportSettings();
+  updateSportChoice();
+  renderLogoPreview('A');
+  renderLogoPreview('B');
+  render();
+  openSetup(false);
+  queueMicrotask(() => document.dispatchEvent(new CustomEvent('scorer:scheduled-game-ready', { detail:{ sport } })));
+}
 
 async function toggleDisplay(){ const entering=!el.appShell.classList.contains('display-mode');el.appShell.classList.toggle('display-mode',entering);el.exitDisplayBtn.classList.toggle('hidden',!entering);if(entering){requestWake();try{await document.documentElement.requestFullscreen?.();}catch{}}else{try{if(document.fullscreenElement)await document.exitFullscreen();}catch{}} }
 async function requestWake(){try{if('wakeLock'in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch{}}
