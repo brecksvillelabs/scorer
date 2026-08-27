@@ -1,0 +1,296 @@
+/* Scorer v0.3.9 — novice-first Quick Start */
+#setupModal[data-v039-step] .setup-modal{
+  width:min(780px,100%);
+}
+.v039-wizard-head{
+  padding:16px 2px 0;
+}
+.v039-progress{
+  display:grid;
+  grid-template-columns:auto 1fr auto 1fr auto;
+  align-items:center;
+  gap:10px;
+}
+.v039-progress>div{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#71869e;
+  font-size:12px;
+  font-weight:900;
+}
+.v039-progress>div span{
+  width:27px;
+  height:27px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:#102238;
+  border:1px solid rgba(148,163,184,.16);
+}
+.v039-progress>div.active{color:#f8fafc}
+.v039-progress>div.active span{
+  color:#04111d;
+  background:#49d9cf;
+  border-color:#49d9cf;
+}
+.v039-progress>div.done{color:#9dded9}
+.v039-progress>div.done span{
+  color:#d7fffb;
+  background:rgba(45,212,191,.16);
+  border-color:rgba(45,212,191,.34);
+}
+.v039-progress>i{
+  height:1px;
+  background:rgba(148,163,184,.18);
+}
+#v039StepHint{
+  margin:12px 0 0;
+  color:#8fa4ba;
+  font-size:13px;
+  line-height:1.45;
+}
+.v039-step-section{
+  border-bottom:0;
+  padding:20px 0 6px;
+}
+.v039-step-sport .section-label,
+.v039-step-format>.section-label{
+  display:none;
+}
+.v039-step-sport .sport-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+.v039-step-sport .sport-choice{
+  min-height:104px;
+  border-radius:22px;
+  font-size:15px;
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.018));
+}
+.v039-step-sport .sport-choice .sport-icon{
+  font-size:31px;
+}
+.v039-step-sport .sport-choice.active{
+  box-shadow:0 0 0 2px rgba(55,207,198,.08) inset;
+}
+.v039-step-teams .team-setup-grid{
+  gap:14px;
+}
+.v039-step-teams .team-setup-card{
+  padding:18px;
+  border-radius:24px;
+  background:linear-gradient(180deg,rgba(18,39,63,.92),rgba(10,24,40,.94));
+}
+.v039-step-teams .team-setup-title{
+  font-size:17px;
+}
+.v039-step-teams label:has(#inputNameA),
+.v039-step-teams label:has(#inputNameB){
+  font-size:12px;
+  color:#aebed0;
+}
+.v039-step-teams #inputNameA,
+.v039-step-teams #inputNameB{
+  min-height:58px;
+  border-radius:16px;
+  font-size:19px;
+  font-weight:850;
+  padding:0 15px;
+}
+.v039-step-teams .favorite-row select{
+  min-height:48px;
+}
+.v039-team-more,
+.v039-format-more{
+  margin-top:4px;
+  border:1px solid rgba(148,163,184,.14);
+  border-radius:16px;
+  background:rgba(4,15,27,.26);
+  overflow:hidden;
+}
+.v039-team-more summary,
+.v039-format-more summary{
+  list-style:none;
+  cursor:pointer;
+  min-height:50px;
+  padding:12px 14px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:2px;
+  color:#d8e4ef;
+  font-size:13px;
+  font-weight:900;
+}
+.v039-team-more summary::-webkit-details-marker,
+.v039-format-more summary::-webkit-details-marker{display:none}
+.v039-team-more summary::after,
+.v039-format-more summary::after{
+  content:'＋';
+  position:absolute;
+  align-self:flex-end;
+  font-size:18px;
+  color:#76dcd5;
+}
+.v039-team-more[open] summary::after,
+.v039-format-more[open] summary::after{content:'−'}
+.v039-team-more summary span,
+.v039-format-more summary span{
+  color:#71869d;
+  font-size:11px;
+  font-weight:750;
+}
+.v039-team-more-body,
+.v039-format-more-body{
+  border-top:1px solid rgba(148,163,184,.12);
+  padding:14px;
+}
+.v039-team-more-body{
+  display:grid;
+  gap:12px;
+}
+.v039-format-hero{
+  display:grid;
+  gap:14px;
+}
+.v039-format-question{
+  color:#f8fafc;
+  font-size:clamp(1.2rem,4vw,1.6rem);
+  font-weight:950;
+  letter-spacing:-.02em;
+}
+.v039-format-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:11px;
+}
+.v039-format-card{
+  min-height:104px;
+  border:1px solid rgba(148,163,184,.17);
+  border-radius:20px;
+  background:linear-gradient(180deg,rgba(17,37,60,.95),rgba(8,23,39,.95));
+  color:#f8fafc;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:flex-start;
+  gap:5px;
+  padding:16px;
+  text-align:left;
+  cursor:pointer;
+}
+.v039-format-card strong{
+  font-size:17px;
+  font-weight:950;
+}
+.v039-format-card span{
+  color:#8298ae;
+  font-size:12px;
+  line-height:1.35;
+}
+.v039-format-card.selected{
+  border-color:#37cfc6;
+  background:linear-gradient(145deg,rgba(13,148,136,.22),rgba(37,99,235,.13));
+  box-shadow:0 0 0 2px rgba(55,207,198,.07) inset;
+}
+.v039-format-card.selected span{color:#aadbd8}
+.v039-secondary-quick:empty{display:none}
+.v039-secondary-quick{
+  margin-top:2px;
+  padding:14px;
+  border:1px solid rgba(148,163,184,.14);
+  border-radius:18px;
+  background:rgba(255,255,255,.018);
+}
+.v039-secondary-label{
+  margin-bottom:9px;
+  color:#9aadc0;
+  font-size:12px;
+  font-weight:900;
+}
+.v039-side-choice{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+.v039-side-choice button{
+  min-height:48px;
+  border:1px solid rgba(148,163,184,.16);
+  border-radius:14px;
+  background:#102136;
+  color:#dce7f2;
+  font-weight:900;
+}
+.v039-side-choice button.selected{
+  border-color:#37cfc6;
+  background:rgba(13,148,136,.17);
+  color:#e8fffd;
+}
+.v039-format-more{
+  margin-top:16px;
+}
+.v039-format-more-body>.section-label{
+  margin-top:0;
+}
+.v039-format-more-body .sport-settings-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+#setupModal[data-v039-step] .modal-footer{
+  margin-top:14px;
+  border-top:1px solid rgba(148,163,184,.12);
+  justify-content:flex-end;
+  align-items:center;
+}
+#setupModal[data-v039-step] .v039-back{
+  margin-right:auto;
+}
+#setupModal[data-v039-step] .v039-next,
+#setupModal[data-v039-step] #startGameBtn{
+  min-width:150px;
+  min-height:52px;
+  font-size:15px;
+}
+#setupModal[data-v039-step="sport"] .modal-footer{
+  display:none;
+}
+@media(max-width:760px){
+  #setupModal[data-v039-step]{
+    padding:0;
+    place-items:end center;
+  }
+  #setupModal[data-v039-step] .setup-modal{
+    width:100%;
+    max-height:96vh;
+    border-radius:26px 26px 0 0;
+    padding:16px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+  .v039-progress{gap:6px}
+  .v039-progress>div b{font-size:11px}
+  .v039-progress>i{min-width:12px}
+  .v039-step-sport .sport-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .v039-step-sport .sport-choice{
+    min-height:92px;
+  }
+  .v039-step-teams .team-setup-grid{
+    grid-template-columns:1fr;
+  }
+  .v039-format-grid{
+    grid-template-columns:1fr 1fr;
+  }
+  #setupModal[data-v039-step] .modal-footer{
+    bottom:calc(-16px - env(safe-area-inset-bottom));
+    padding:12px 0 calc(12px + env(safe-area-inset-bottom));
+  }
+}
+@media(max-width:430px){
+  .v039-progress>div{gap:5px}
+  .v039-progress>div span{width:24px;height:24px}
+  .v039-format-grid{grid-template-columns:1fr}
+  .v039-format-card{min-height:82px}
+  .v039-side-choice{grid-template-columns:1fr}
+  #setupModal[data-v039-step] .v039-next,
+  #setupModal[data-v039-step] #startGameBtn{min-width:132px}
+}
