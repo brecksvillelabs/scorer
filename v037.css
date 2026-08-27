@@ -1,0 +1,30 @@
+/* Scorer v0.3.7 — direct camera + timeout recovery */
+.quick-camera-btn{
+  background:linear-gradient(135deg,#20c8be,#347df4);
+  border:0;
+  box-shadow:0 8px 24px rgba(32,200,190,.18);
+}
+.quick-photo-input{
+  position:fixed;
+  width:1px;
+  height:1px;
+  left:-10000px;
+  top:0;
+  opacity:0;
+  pointer-events:none;
+}
+.diary-storage-warning{
+  border-style:solid;
+  border-color:rgba(245,158,11,.35);
+  color:#f5c46b;
+  background:rgba(245,158,11,.07);
+}
+.timeout-recovery{
+  border-color:rgba(53,207,198,.32);
+  color:#a7eee8;
+}
+.display-mode #quickCameraBtn,
+.display-mode #journalBtn{display:none!important}
+@media(max-width:760px){
+  .quick-camera-btn{box-shadow:none}
+}
