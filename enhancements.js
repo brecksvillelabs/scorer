@@ -29,6 +29,7 @@ const el = {
   inputRosterA: $('inputRosterA'), inputRosterB: $('inputRosterB'), logoPreviewA: $('logoPreviewA'), logoPreviewB: $('logoPreviewB'),
   favoriteSelectA: $('favoriteSelectA'), favoriteSelectB: $('favoriteSelectB'), saveFavoriteA: $('saveFavoriteA'), saveFavoriteB: $('saveFavoriteB'), deleteFavoriteA: $('deleteFavoriteA'), deleteFavoriteB: $('deleteFavoriteB'),
   startGameBtn: $('startGameBtn'), resetSavedBtn: $('resetSavedBtn'),
+  quickCameraBtn: $('quickCameraBtn'), quickPhotoInput: $('quickPhotoInput'),
   journalBtn: $('journalBtn'), journalModal: $('journalModal'), closeJournalBtn: $('closeJournalBtn'), journalMatchCard: $('journalMatchCard'), capturePanel: $('capturePanel'), diarySummary: $('diarySummary'),
   photoCaption: $('photoCaption'), photoInput: $('photoInput'), saveNoteBtn: $('saveNoteBtn'), momentHighlight: $('momentHighlight'), archiveMatchBtn: $('archiveMatchBtn'), albumGrid: $('albumGrid'), historyList: $('historyList'), toast: $('toast')
 };
@@ -70,6 +71,8 @@ function bind() {
     setTimeout(() => { ensureCurrentMatchId(true); renderFavoriteSelects(); }, 0);
   }, true);
 
+  el.quickCameraBtn.addEventListener('click', openQuickCamera);
+  el.quickPhotoInput.addEventListener('change', event => capturePhoto(event, true));
   el.journalBtn.addEventListener('click', () => openJournal());
   el.closeJournalBtn.addEventListener('click', closeJournal);
   el.archiveMatchBtn.addEventListener('click', () => {
@@ -208,8 +211,15 @@ function normalizedState() {
 function ensureCurrentMatchId(forceNew = false) {
   const state = rawState();
   if (!state) return '';
-  const id = !forceNew && state.matchId ? state.matchId : (!forceNew && localStorage.getItem(ACTIVE_ID_KEY)) || makeId();
+  // app.js creates the canonical matchId. Never replace a valid state matchId
+  // with a second enhancements-only ID after Start scoreboard.
+  const id = state.matchId || (!forceNew && localStorage.getItem(ACTIVE_ID_KEY)) || makeId();
   localStorage.setItem(ACTIVE_ID_KEY, id);
+  if (!state.matchId) {
+    state.matchId = id;
+    state.startedAt = Number(state.startedAt || state.updatedAt || Date.now());
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch {}
+  }
   return id;
 }
 
@@ -263,7 +273,9 @@ async function renderJournal() {
   el.capturePanel.classList.toggle('hidden', !current);
   revokeUrls();
   let photos = [];
-  try { photos = await listMatchPhotos(summary.matchId); } catch {}
+  let photoLoadError = '';
+  try { photos = await listMatchPhotos(summary.matchId); }
+  catch (error) { photoLoadError = error?.message || 'Could not read saved photos'; }
   const notes = listMatchNotes(summary.matchId);
   const items = mergeDiaryItems(photos, notes, getPhotoHighlights());
   const counts = diaryMomentSummary(items);
@@ -271,9 +283,10 @@ async function renderJournal() {
   const moments = [diaryBookend('start', summary.startedAt, 'Game started', sportName(summary.sport))];
   moments.push(...items.map(diaryItemCard));
   if (summary.finished) moments.push(diaryBookend('final', summary.updatedAt, `FINAL · ${summary.score}`, summary.detail || summary.period || ''));
-  el.albumGrid.innerHTML = items.length || summary.finished
+  const loadWarning = photoLoadError ? `<div class="album-empty diary-storage-warning">⚠ ${esc(photoLoadError)}. Photos may still be on this device; Scorer could not read them right now.</div>` : '';
+  el.albumGrid.innerHTML = loadWarning + (items.length || summary.finished
     ? moments.join('')
-    : moments.join('') + '<div class="album-empty diary-empty">Add a photo or quick note during the game. Scorer will stamp the live score and game state onto the moment.</div>';
+    : moments.join('') + '<div class="album-empty diary-empty">Add a photo or quick note during the game. Scorer will stamp the live score and game state onto the moment.</div>');
   renderHistoryList(summary.matchId);
 }
 
@@ -304,20 +317,35 @@ function momentTime(timestamp) {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-async function capturePhoto(event) {
-  const file = event.target.files?.[0];
+function openQuickCamera() {
+  const state = normalizedState();
+  if (!state) return toast('Start or resume a match before taking a photo');
+  ensureCurrentMatchId();
+  el.quickPhotoInput.value = '';
+  el.quickPhotoInput.click();
+}
+
+async function capturePhoto(event, quick = false) {
+  const input = event.target;
+  const file = input.files?.[0];
   const state = normalizedState();
   if (!file || !state) return;
   try {
-    const photo = await addMatchPhoto(state.matchId, file, matchContext(state), el.photoCaption.value);
-    if (el.momentHighlight.checked) setPhotoHighlighted(photo.id, state.matchId, true);
+    const caption = quick ? '' : el.photoCaption.value;
+    const highlighted = quick ? false : el.momentHighlight.checked;
+    const photo = await addMatchPhoto(state.matchId, file, matchContext(state), caption);
+    if (highlighted) setPhotoHighlighted(photo.id, state.matchId, true);
     archiveState(state, false);
-    resetMomentComposer();
-    el.photoInput.value = '';
+    if (!quick) resetMomentComposer();
+    input.value = '';
     viewingMatchId = state.matchId;
-    await renderJournal();
-    toast('Photo added to Game Diary');
-  } catch (error) { toast(error?.message || 'Could not save photo'); }
+    if (!el.journalModal.classList.contains('hidden')) await renderJournal();
+    const ctx = photo.context || {};
+    toast(`Photo saved${ctx.score ? ` · ${ctx.score}` : ''}`);
+  } catch (error) {
+    input.value = '';
+    toast(error?.message || 'Could not save photo');
+  }
 }
 
 async function saveQuickNote() {
