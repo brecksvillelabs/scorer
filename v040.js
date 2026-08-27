@@ -9,6 +9,7 @@ import {
 
 const $ = id => document.getElementById(id);
 let editingId = '';
+let pendingDeleteId = '';
 let highlightId = '';
 let capability = null;
 
@@ -56,6 +57,7 @@ function installModal() {
         </div>
         <div id="v040NativeStatus" class="v040-native-status"></div>
         <div id="v040Form" class="v040-form-wrap hidden"></div>
+        <div id="v040DeleteConfirm" class="v040-delete-confirm hidden"></div>
         <div id="v040List" class="v040-list"></div>
       </div>
     </div>`);
@@ -63,6 +65,7 @@ function installModal() {
   $('v040Close').addEventListener('click', closeSchedule);
   $('v040Add').addEventListener('click', () => openForm());
   $('v040List').addEventListener('click', handleListAction);
+  $('v040DeleteConfirm').addEventListener('click', handleDeleteConfirm);
   $('v040Form').addEventListener('submit', handleFormSubmit);
   $('v040Form').addEventListener('click', handleFormClick);
 }
@@ -86,6 +89,7 @@ function closeSchedule() {
   $('v040ScheduleModal')?.classList.add('hidden');
   $('v040ScheduleModal')?.setAttribute('aria-hidden','true');
   closeForm();
+  closeDeleteConfirm();
 }
 
 function closeHome() {
@@ -202,6 +206,7 @@ async function handleFormSubmit(event) {
   event.preventDefault();
   const starts = $('v040StartsAt')?.value;
   if (!starts || Number.isNaN(new Date(starts).getTime())) return toast('Choose a valid game date and time');
+  if (new Date(starts).getTime() < Date.now() - 5 * 60 * 1000) return toast('Choose a future game time');
 
   const existing = readGames().find(game => game.id === editingId);
   const reminders = [...document.querySelectorAll('input[name="v040Reminder"]:checked')].map(x => Number(x.value));
@@ -263,12 +268,37 @@ async function handleListAction(event) {
     return;
   }
   if (action === 'delete') {
-    if (!confirm(`Delete ${gameTitle(game)} from Upcoming Games?`)) return;
-    try { await cancelGameReminders(game); } catch {}
-    writeGames(readGames().filter(item => item.id !== id));
-    renderList();
-    toast('Scheduled game deleted');
+    pendingDeleteId = id;
+    const host = $('v040DeleteConfirm');
+    host.innerHTML = `
+      <div><strong>Delete ${esc(gameTitle(game))}?</strong><span>This removes the scheduled game and cancels its local reminders on this device.</span></div>
+      <div><button type="button" data-v040-delete-action="cancel">Cancel</button><button class="danger" type="button" data-v040-delete-action="confirm">Delete game</button></div>`;
+    host.classList.remove('hidden');
+    host.scrollIntoView({ behavior:'smooth', block:'nearest' });
   }
+}
+
+async function handleDeleteConfirm(event) {
+  const action = event.target.closest('[data-v040-delete-action]')?.dataset.v040DeleteAction;
+  if (!action) return;
+  if (action === 'cancel') return closeDeleteConfirm();
+  if (action !== 'confirm' || !pendingDeleteId) return;
+  const game = readGames().find(item => item.id === pendingDeleteId);
+  if (game) {
+    try { await cancelGameReminders(game); } catch {}
+    writeGames(readGames().filter(item => item.id !== pendingDeleteId));
+  }
+  closeDeleteConfirm();
+  renderList();
+  toast('Scheduled game deleted');
+}
+
+function closeDeleteConfirm() {
+  pendingDeleteId = '';
+  const host = $('v040DeleteConfirm');
+  if (!host) return;
+  host.classList.add('hidden');
+  host.innerHTML = '';
 }
 
 function startScheduledGame(game) {
