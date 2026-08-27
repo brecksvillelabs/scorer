@@ -135,7 +135,7 @@ function openDb() {
   });
 }
 
-function inferImageMime(file) {
+export function inferImageMime(file) {
   const supplied = String(file?.type || '').toLowerCase();
   if (supplied.startsWith('image/')) return supplied;
   const name = String(file?.name || '').toLowerCase();
