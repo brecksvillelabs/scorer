@@ -135,9 +135,22 @@ function openDb() {
   });
 }
 
+function inferImageMime(file) {
+  const supplied = String(file?.type || '').toLowerCase();
+  if (supplied.startsWith('image/')) return supplied;
+  const name = String(file?.name || '').toLowerCase();
+  if (/\.jpe?g$/.test(name)) return 'image/jpeg';
+  if (/\.png$/.test(name)) return 'image/png';
+  if (/\.webp$/.test(name)) return 'image/webp';
+  if (/\.gif$/.test(name)) return 'image/gif';
+  if (/\.heic$/.test(name)) return 'image/heic';
+  if (/\.heif$/.test(name)) return 'image/heif';
+  return '';
+}
+
 function originalFallback(file) {
   if (file.size > MAX_ORIGINAL_FALLBACK_BYTES) throw new Error('This photo is too large to save. Try a smaller image or screenshot.');
-  return file.slice(0, file.size, file.type || 'image/jpeg');
+  return file.slice(0, file.size, inferImageMime(file) || 'image/jpeg');
 }
 
 async function decodeBitmap(file) {
@@ -171,7 +184,9 @@ async function canvasBlob(canvas) {
 }
 
 async function compressImage(file) {
-  if (!file || !String(file.type || '').startsWith('image/')) throw new Error('Choose a photo or image file');
+  if (!file) throw new Error('Choose a photo or image file');
+  const inferredMime = inferImageMime(file);
+  if (!inferredMime && String(file.type || '')) throw new Error('Choose a photo or image file');
 
   let source = await decodeBitmap(file);
   let html = null;
@@ -218,6 +233,19 @@ async function putPhoto(item) {
   } finally { db.close(); }
 }
 
+async function readPhoto(id) {
+  const db = await openDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error || new Error('Could not verify saved photo'));
+      tx.onerror = () => reject(tx.error || new Error('Could not verify photo storage'));
+    });
+  } finally { db.close(); }
+}
+
 export async function addMatchPhoto(matchId, file, context, caption = '') {
   if (!matchId) throw new Error('Start or resume a match before adding photos');
   const blob = await compressImage(file);
@@ -231,7 +259,11 @@ export async function addMatchPhoto(matchId, file, context, caption = '') {
     createdAt: Date.now()
   };
   await putPhoto(item);
-  return item;
+  const verified = await readPhoto(item.id);
+  if (!verified || verified.matchId !== matchId || !verified.blob) {
+    throw new Error('Photo storage could not verify the saved image. Please try again.');
+  }
+  return verified;
 }
 
 function structuredCloneSafe(value) {
@@ -244,7 +276,7 @@ export async function listMatchPhotos(matchId) {
   try {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).index('matchId').getAll(IDBKeyRange.only(matchId));
+      const req = tx.objectStore(STORE).index('matchId').getAll(matchId);
       req.onsuccess = () => resolve((req.result || []).sort((a,b) => a.createdAt - b.createdAt));
       req.onerror = () => reject(req.error || new Error('Could not load match photos'));
       tx.onerror = () => reject(tx.error || new Error('Could not read photo storage'));
@@ -273,7 +305,7 @@ export async function deleteMatchPhotos(matchId) {
     await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readwrite');
       const store = tx.objectStore(STORE);
-      const req = store.index('matchId').openKeyCursor(IDBKeyRange.only(matchId));
+      const req = store.index('matchId').openKeyCursor(matchId);
       req.onsuccess = () => {
         const cursor = req.result;
         if (!cursor) return;
