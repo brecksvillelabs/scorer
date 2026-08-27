@@ -49,7 +49,7 @@ test('lacrosse quick format keeps Field and Sixes distinct', () => {
 test('racket sports use player/team terminology', () => {
   assert.equal(sportRoleCopy('tennis').sideA, 'Player / Team A');
   assert.equal(sportRoleCopy('badminton').nameB, 'Player / team name');
-  assert.equal(sportRoleCopy('baseball').sideA, 'Home / Team A');
+  assert.equal(sportRoleCopy('baseball').sideA, 'Team A');
 });
 
 test('preset selection compares the underlying trusted setup fields', () => {
