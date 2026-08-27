@@ -52,7 +52,7 @@ function boot() {
     state = createStateFor({ sport: selectedSport }); renderSportSettings(); openSetup(false);
   }
   render(); setInterval(clockTick, 1000);
-  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 
 function bindEvents() {
