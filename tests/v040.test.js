@@ -124,6 +124,14 @@ test('Capacitor dependencies are version-pinned and service worker is disabled i
   assert.match(app, /!window\.Capacitor\?\.isNativePlatform\?\.\(\)/);
 });
 
+test('Upcoming Games correction UX stays in-app and rejects past schedule times', async () => {
+  const source = await readFile(new URL('../v040.js', import.meta.url), 'utf8');
+  assert.match(source, /id="v040DeleteConfirm"/);
+  assert.match(source, /data-v040-delete-action="confirm"/);
+  assert.match(source, /Choose a future game time/);
+  assert.doesNotMatch(source, /\bconfirm\s*\(/);
+});
+
 test('native build preparation and Android Gradle shell are checked in', async () => {
   const prep = await readFile(new URL('../scripts/prepare-native.mjs', import.meta.url), 'utf8');
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
