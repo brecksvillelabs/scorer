@@ -1,0 +1,345 @@
+/* Scorer v0.4.0 — Upcoming Games + mobile foundation */
+.v040-home-action strong{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.v040-count{
+  min-width:23px;
+  height:23px;
+  padding:0 7px;
+  border-radius:999px;
+  display:inline-grid;
+  place-items:center;
+  background:#20c8be;
+  color:#03111c;
+  font-size:12px;
+  font-weight:950;
+}
+.v040-card{
+  width:min(860px,100%);
+  max-height:92vh;
+  overflow:auto;
+  border:1px solid rgba(148,163,184,.2);
+  border-radius:28px;
+  background:linear-gradient(180deg,#0d1a2d,#081321);
+  box-shadow:0 30px 90px rgba(0,0,0,.52);
+  padding:22px;
+  color:#f8fafc;
+}
+.v040-intro{
+  margin:16px 0 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+}
+.v040-intro>div{
+  display:grid;
+  gap:4px;
+}
+.v040-intro strong{
+  font-size:16px;
+}
+.v040-intro span{
+  color:#8fa3b8;
+  font-size:13px;
+  line-height:1.45;
+}
+.v040-intro .primary-btn{
+  min-height:48px;
+  flex:0 0 auto;
+}
+.v040-native-status{
+  margin-bottom:14px;
+  padding:11px 13px;
+  border:1px solid rgba(148,163,184,.14);
+  border-radius:15px;
+  background:rgba(255,255,255,.025);
+  display:grid;
+  gap:2px;
+}
+.v040-native-status strong{
+  font-size:12px;
+}
+.v040-native-status span{
+  color:#8095aa;
+  font-size:12px;
+  line-height:1.4;
+}
+.v040-native-status.native{
+  border-color:rgba(45,212,191,.22);
+  background:rgba(13,148,136,.07);
+}
+.v040-native-status.native strong{color:#99f6e4}
+.v040-list{
+  display:grid;
+  gap:11px;
+}
+.v040-game{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  gap:14px;
+  align-items:center;
+  padding:14px;
+  border:1px solid rgba(148,163,184,.16);
+  border-radius:20px;
+  background:rgba(15,30,50,.72);
+  transition:.18s ease;
+}
+.v040-game.highlighted{
+  border-color:#37cfc6;
+  box-shadow:0 0 0 3px rgba(55,207,198,.08);
+}
+.v040-game.past{opacity:.62}
+.v040-game-icon{
+  width:50px;
+  height:50px;
+  border-radius:16px;
+  display:grid;
+  place-items:center;
+  background:#102238;
+  font-size:25px;
+}
+.v040-game-main{
+  min-width:0;
+  display:grid;
+  gap:4px;
+}
+.v040-game-top{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.v040-game-top span{
+  color:#77dcd6;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:900;
+}
+.v040-game-top em{
+  padding:3px 7px;
+  border-radius:999px;
+  background:rgba(255,255,255,.045);
+  color:#94a3b8;
+  font-size:10px;
+  font-style:normal;
+  font-weight:850;
+}
+.v040-game-main>strong{
+  font-size:17px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.v040-when{
+  color:#a6b6c8;
+  font-size:13px;
+}
+.v040-reminder-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:3px;
+}
+.v040-reminder-chips span{
+  padding:4px 7px;
+  border:1px solid rgba(148,163,184,.13);
+  border-radius:999px;
+  color:#8297ae;
+  background:rgba(255,255,255,.02);
+  font-size:10px;
+  font-weight:800;
+}
+.v040-game-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  width:210px;
+}
+.v040-game-actions button,
+.v040-empty button,
+.v040-form-head button{
+  min-height:40px;
+  border:1px solid rgba(148,163,184,.2);
+  border-radius:11px;
+  background:#102136;
+  color:#edf5fb;
+  font-weight:850;
+}
+.v040-game-actions .primary{
+  border-color:rgba(45,212,191,.34);
+  background:rgba(13,148,136,.2);
+  color:#ccfbf1;
+}
+.v040-game-actions .danger{
+  border-color:rgba(248,113,113,.25);
+  background:rgba(127,29,29,.2);
+  color:#fecaca;
+}
+.v040-empty{
+  padding:34px 18px;
+  border:1px dashed rgba(148,163,184,.2);
+  border-radius:20px;
+  display:grid;
+  place-items:center;
+  gap:8px;
+  text-align:center;
+  color:#8fa3b8;
+}
+.v040-empty-icon{
+  font-size:34px;
+}
+.v040-empty strong{
+  color:#f8fafc;
+  font-size:17px;
+}
+.v040-empty span{
+  max-width:430px;
+  line-height:1.45;
+  font-size:13px;
+}
+.v040-empty button{
+  margin-top:5px;
+  padding:0 15px;
+}
+.v040-form-wrap{
+  margin:0 0 16px;
+}
+.v040-form{
+  padding:16px;
+  border:1px solid rgba(45,212,191,.2);
+  border-radius:20px;
+  background:linear-gradient(180deg,rgba(13,148,136,.08),rgba(8,23,39,.8));
+  display:grid;
+  gap:12px;
+}
+.v040-form-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  padding-bottom:10px;
+  border-bottom:1px solid rgba(148,163,184,.12);
+}
+.v040-form-head>div{
+  display:grid;
+  gap:2px;
+}
+.v040-form-head span{
+  color:#5eead4;
+  font-size:10px;
+  letter-spacing:.12em;
+  font-weight:900;
+}
+.v040-form-head strong{
+  font-size:17px;
+}
+.v040-form-head button{
+  width:42px;
+  min-height:42px;
+}
+.v040-team-fields{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.v040-form label{
+  color:#a1b1c3;
+}
+.v040-form input,
+.v040-form select{
+  min-height:48px;
+}
+.v040-form .optional{
+  color:#6f849a;
+  font-size:10px;
+  font-weight:700;
+}
+.v040-form fieldset{
+  border:0;
+  padding:0;
+  margin:2px 0 0;
+}
+.v040-form legend{
+  margin-bottom:8px;
+  color:#a1b1c3;
+  font-size:12px;
+  font-weight:850;
+}
+.v040-reminders{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+}
+.v040-reminders label{
+  min-height:48px;
+  border:1px solid rgba(148,163,184,.15);
+  border-radius:13px;
+  background:#0d1d30;
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  gap:8px;
+  padding:10px;
+  color:#d9e4ef;
+}
+.v040-reminders input{
+  width:18px;
+  min-height:18px;
+  accent-color:#20c8be;
+}
+.v040-form-note{
+  color:#7f94aa;
+  font-size:11px;
+  line-height:1.45;
+}
+.v040-form-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  padding-top:2px;
+}
+.v040-form-actions button{
+  min-height:48px;
+}
+@media(max-width:700px){
+  .v040-card{
+    width:100%;
+    max-height:96vh;
+    border-radius:26px 26px 0 0;
+    padding:16px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+  #v040ScheduleModal{
+    align-items:end;
+    padding:0;
+  }
+  .v040-intro{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .v040-intro .primary-btn{
+    width:100%;
+  }
+  .v040-game{
+    grid-template-columns:auto minmax(0,1fr);
+  }
+  .v040-game-actions{
+    grid-column:1/-1;
+    width:auto;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
+@media(max-width:520px){
+  .v040-team-fields,
+  .v040-reminders{
+    grid-template-columns:1fr;
+  }
+  .v040-game-actions{
+    grid-template-columns:1fr 1fr;
+  }
+  .v040-game-actions button{
+    min-height:46px;
+  }
+}
