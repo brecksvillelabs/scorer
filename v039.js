@@ -111,6 +111,12 @@ function bindWizard() {
 
   $('inputNameA')?.addEventListener('input', syncSecondaryLabels);
   $('inputNameB')?.addEventListener('input', syncSecondaryLabels);
+  document.addEventListener('scorer:scheduled-game-ready', () => {
+    editingMode = false;
+    enhanceTeamCards();
+    ensureFormatHero(true);
+    setTimeout(() => setStep('format'), 0);
+  });
 }
 
 function observeSetup() {
