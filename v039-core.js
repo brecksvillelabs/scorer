@@ -12,8 +12,8 @@ export function sportRoleCopy(sport) {
   }
   return {
     title: 'Who is playing?',
-    sideA: 'Home / Team A',
-    sideB: 'Away / Team B',
+    sideA: 'Team A',
+    sideB: 'Team B',
     nameA: 'Team name',
     nameB: 'Team name'
   };
