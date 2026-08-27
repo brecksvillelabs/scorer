@@ -29,7 +29,7 @@ The native shell packages the local web assets from `dist/`. It does not point t
 
 ## Upcoming Games
 
-Home now includes **Upcoming Games**.
+A fresh install now opens the **Home** hub instead of forcing the operator directly into match setup. Home includes **Upcoming Games** alongside the existing Quick Score / game-management actions.
 
 A scheduled game stores:
 - sport
@@ -111,6 +111,8 @@ The following remain on the device:
 - local photos
 
 No account or cloud sync is introduced in this release.
+
+The Android manifest sets `android:allowBackup="false"` so Scorer's local app data is not intentionally enrolled in Android app-data cloud backup.
 
 ## Android build
 
