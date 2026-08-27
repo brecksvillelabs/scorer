@@ -23,6 +23,17 @@ function boot040() {
     openSchedule();
   });
   refreshHomeBadge();
+  showFreshHome();
+}
+
+function showFreshHome() {
+  if (localStorage.getItem('scorer-state-v2')) return;
+  if (sessionStorage.getItem('scorer-v040-home-shown') === '1') return;
+  sessionStorage.setItem('scorer-v040-home-shown', '1');
+  setTimeout(() => {
+    $('closeSetupBtn')?.click();
+    $('homeBtn')?.click();
+  }, 60);
 }
 
 function installHomeAction() {
