@@ -124,6 +124,14 @@ test('Capacitor dependencies are version-pinned and service worker is disabled i
   assert.match(app, /!window\.Capacitor\?\.isNativePlatform\?\.\(\)/);
 });
 
+test('fresh installs open the Home hub instead of forcing setup', async () => {
+  const source = await readFile(new URL('../v040.js', import.meta.url), 'utf8');
+  assert.match(source, /function showFreshHome/);
+  assert.match(source, /scorer-v040-home-shown/);
+  assert.match(source, /\$\('closeSetupBtn'\)\?\.click\(\)/);
+  assert.match(source, /\$\('homeBtn'\)\?\.click\(\)/);
+});
+
 test('Upcoming Games correction UX stays in-app and rejects past schedule times', async () => {
   const source = await readFile(new URL('../v040.js', import.meta.url), 'utf8');
   assert.match(source, /id="v040DeleteConfirm"/);
