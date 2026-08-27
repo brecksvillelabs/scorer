@@ -166,7 +166,6 @@ function setStep(step) {
     setupTitle.textContent = sportRoleCopy(sport).title;
     if (hint) hint.textContent = `${sportName} · Names first. Saved teams are one tap away; logos, colors and rosters are optional.`;
     updateTeamCopy();
-    requestAnimationFrame(() => $('inputNameA')?.focus({ preventScroll: true }));
   } else {
     setupTitle.textContent = `${sportName} format`;
     if (hint) hint.textContent = 'Pick the format you are playing. Open Advanced match options only if your league needs something different.';
@@ -207,6 +206,15 @@ function enhanceTeamCards() {
       child !== title && child !== favorite && child !== name && child !== details
     );
     advanced.forEach(child => body.appendChild(child));
+
+    if (favorite) {
+      favorite.classList.add('v039-favorite-picker');
+      const favoriteActions = document.createElement('div');
+      favoriteActions.className = 'v039-favorite-actions';
+      [...favorite.querySelectorAll('button')].forEach(button => favoriteActions.appendChild(button));
+      if (favoriteActions.children.length) body.prepend(favoriteActions);
+    }
+
     card.appendChild(details);
   });
 }
