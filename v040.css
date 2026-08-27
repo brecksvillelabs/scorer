@@ -72,6 +72,36 @@
   background:rgba(13,148,136,.07);
 }
 .v040-native-status.native strong{color:#99f6e4}
+.v040-delete-confirm{
+  margin:0 0 14px;
+  padding:14px;
+  border:1px solid rgba(248,113,113,.28);
+  border-radius:18px;
+  background:rgba(127,29,29,.14);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+}
+.v040-delete-confirm.hidden{display:none}
+.v040-delete-confirm>div:first-child{display:grid;gap:4px}
+.v040-delete-confirm strong{color:#fff}
+.v040-delete-confirm span{color:#cbd5e1;font-size:12px;line-height:1.4}
+.v040-delete-confirm>div:last-child{display:flex;gap:8px;flex:0 0 auto}
+.v040-delete-confirm button{
+  min-height:42px;
+  padding:0 12px;
+  border:1px solid rgba(148,163,184,.2);
+  border-radius:11px;
+  background:#102136;
+  color:#f8fafc;
+  font-weight:850;
+}
+.v040-delete-confirm button.danger{
+  border-color:rgba(248,113,113,.35);
+  background:rgba(127,29,29,.28);
+  color:#fecaca;
+}
 .v040-list{
   display:grid;
   gap:11px;
@@ -322,6 +352,11 @@
   .v040-intro .primary-btn{
     width:100%;
   }
+  .v040-delete-confirm{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .v040-delete-confirm>div:last-child button{flex:1}
   .v040-game{
     grid-template-columns:auto minmax(0,1fr);
   }
