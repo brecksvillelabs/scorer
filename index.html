@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./v035.css">
   <link rel="stylesheet" href="./v036.css">
+  <link rel="stylesheet" href="./v037.css">
 </head>
 <body>
   <div class="app-shell" id="appShell">
@@ -22,7 +23,8 @@
         <button id="undoBtn" class="icon-btn" type="button" aria-label="Undo">↶</button>
         <button id="swapBtn" class="icon-btn" type="button" aria-label="Swap sides">⇄</button>
         <button id="editBtn" class="icon-btn" type="button" aria-label="Game setup">⚙</button>
-        <button id="journalBtn" class="icon-btn" type="button" aria-label="Game diary">📖</button>
+        <button id="quickCameraBtn" class="icon-btn quick-camera-btn" type="button" aria-label="Take game photo">📷</button>
+        <button id="journalBtn" class="icon-btn" type="button" aria-label="Open Game Diary">📖</button>
         <button id="displayBtn" class="display-btn" type="button">Display</button>
       </div>
     </header>
@@ -41,6 +43,7 @@
   </div>
 
   <button class="exit-display hidden" id="exitDisplayBtn" type="button">Exit display</button>
+  <input id="quickPhotoInput" class="quick-photo-input" type="file" accept="image/*" capture="environment" aria-hidden="true" tabindex="-1">
   <div class="toast" id="toast" role="status"></div>
 
   <div class="modal-backdrop" id="setupModal" aria-hidden="true">
