@@ -1,0 +1,91 @@
+/* Scorer v0.3.8 — in-app camera reliability */
+.gallery-pick{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+.gallery-pick input{display:none}
+.camera-overlay{
+  position:fixed;
+  inset:0;
+  z-index:2600;
+  background:rgba(2,8,23,.88);
+  backdrop-filter:blur(14px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+}
+.camera-overlay.hidden{display:none}
+.camera-sheet{
+  width:min(720px,100%);
+  max-height:94vh;
+  overflow:auto;
+  border:1px solid rgba(148,163,184,.2);
+  border-radius:26px;
+  background:#0b1626;
+  box-shadow:0 30px 90px rgba(0,0,0,.55);
+  padding:16px;
+  color:#f8fafc;
+}
+.camera-sheet-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  margin-bottom:12px;
+}
+.camera-sheet-head h2{margin:2px 0 0;font-size:25px}
+.camera-preview-wrap{
+  position:relative;
+  width:100%;
+  aspect-ratio:4/3;
+  border-radius:20px;
+  overflow:hidden;
+  background:#020817;
+  border:1px solid rgba(148,163,184,.16);
+}
+.camera-preview-wrap video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  background:#020817;
+}
+.camera-status{
+  position:absolute;
+  left:12px;
+  right:12px;
+  bottom:12px;
+  padding:9px 12px;
+  border-radius:12px;
+  background:rgba(2,8,23,.72);
+  color:#cbd5e1;
+  font-size:13px;
+  text-align:center;
+}
+.camera-status.ready{display:none}
+.camera-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:12px;
+}
+.camera-actions button{min-height:54px}
+.camera-hint{
+  margin-top:10px;
+  color:#94a3b8;
+  font-size:12px;
+  text-align:center;
+}
+@media(max-width:620px){
+  .camera-overlay{align-items:flex-end;padding:0}
+  .camera-sheet{
+    width:100%;
+    border-radius:24px 24px 0 0;
+    padding:12px 12px max(14px,env(safe-area-inset-bottom));
+  }
+  .camera-preview-wrap{aspect-ratio:3/4}
+  .camera-actions{grid-template-columns:1fr}
+}
