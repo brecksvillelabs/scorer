@@ -1,6 +1,7 @@
 import { formatClock, formatOvers, formatTennisPoint, getPeriodText, otherSide, teamKey } from './sports.js';
 import { getScorerPeriodText } from './v035-core.js';
 import { getBaseballPeriodText } from './baseball-core.js';
+import { isRecoverablePhoto } from './v038-core.js';
 
 const DB_NAME = 'scorer-media-v1';
 const STORE = 'photos';
@@ -58,7 +59,7 @@ export function matchContext(state) {
   const a = state.teamA?.name || 'Side A';
   const b = state.teamB?.name || 'Side B';
   const period = sportPeriod(state);
-  const base = { sport: state.sport, title: `${a} vs ${b}`, period, timestamp: Date.now() };
+  const base = { matchId: state.matchId || '', sport: state.sport, title: `${a} vs ${b}`, period, timestamp: Date.now() };
   if (state.sport === 'cricket') {
     const batSide = state.cricket.battingTeam;
     const bat = state[teamKey(batSide)];
@@ -281,6 +282,33 @@ export async function listMatchPhotos(matchId) {
       req.onerror = () => reject(req.error || new Error('Could not load match photos'));
       tx.onerror = () => reject(tx.error || new Error('Could not read photo storage'));
     });
+  } finally { db.close(); }
+}
+
+export async function recoverMatchPhotos(summary) {
+  if (!summary?.matchId) return 0;
+  const db = await openDb();
+  let recovered = 0;
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        for (const item of req.result || []) {
+          if (!isRecoverablePhoto(item, summary)) continue;
+          item.matchId = summary.matchId;
+          item.context = { ...(item.context || {}), matchId: summary.matchId };
+          store.put(item);
+          recovered += 1;
+        }
+      };
+      req.onerror = () => reject(req.error || new Error('Could not inspect saved photos'));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('Could not recover saved photos'));
+      tx.onabort = () => reject(tx.error || new Error('Photo recovery was interrupted'));
+    });
+    return recovered;
   } finally { db.close(); }
 }
 

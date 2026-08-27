@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="./v035.css">
   <link rel="stylesheet" href="./v036.css">
   <link rel="stylesheet" href="./v037.css">
+  <link rel="stylesheet" href="./v038.css">
 </head>
 <body>
   <div class="app-shell" id="appShell">
@@ -104,7 +105,8 @@
             <label class="diary-note-field">Quick note<input id="photoCaption" maxlength="500" placeholder="Huge save, great rally, first goal, celebration…"></label>
             <label class="highlight-toggle"><input id="momentHighlight" type="checkbox"> <span>⭐ Highlight this moment</span></label>
             <div class="diary-composer-actions">
-              <label class="camera-btn">📷 Add photo<input id="photoInput" type="file" accept="image/*" capture="environment"></label>
+              <button id="diaryCameraBtn" class="camera-btn" type="button">📷 Take photo</button>
+              <label class="secondary-btn gallery-pick">🖼 Choose photo<input id="photoInput" type="file" accept="image/*"></label>
               <button id="saveNoteBtn" class="secondary-btn diary-note-btn" type="button">📝 Save note</button>
               <button id="archiveMatchBtn" class="secondary-btn" type="button">Save match</button>
             </div>
@@ -117,6 +119,24 @@
         </aside>
       </div>
     </div>
+  </div>
+
+  <div class="camera-overlay hidden" id="cameraModal" aria-hidden="true">
+    <section class="camera-sheet" role="dialog" aria-modal="true" aria-labelledby="cameraTitle">
+      <div class="camera-sheet-head">
+        <div><div class="eyebrow">GAME MOMENT</div><h2 id="cameraTitle">Take photo</h2></div>
+        <button id="cameraCancelBtn" class="icon-btn" type="button" aria-label="Close camera">✕</button>
+      </div>
+      <div class="camera-preview-wrap">
+        <video id="cameraPreview" autoplay playsinline muted></video>
+        <div id="cameraStatus" class="camera-status">Starting camera…</div>
+      </div>
+      <div class="camera-actions">
+        <button id="cameraCaptureBtn" class="primary-btn" type="button" disabled>📷 Capture</button>
+        <button id="cameraFallbackBtn" class="secondary-btn" type="button">Use phone camera instead</button>
+      </div>
+      <div class="camera-hint">The score stamp is captured when you press Capture.</div>
+    </section>
   </div>
 
   <script type="module" src="./app.js"></script>

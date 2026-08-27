@@ -58,7 +58,7 @@ test('top bar has a direct camera control separate from Game Diary', async () =>
   assert.match(html, /id="quickCameraBtn"[^>]*>📷<\/button>/);
   assert.match(html, /id="journalBtn"[^>]*>📖<\/button>/);
   assert.match(html, /id="quickPhotoInput"[^>]*capture="environment"/);
-  assert.match(enhancements, /quickCameraBtn\.addEventListener\('click', openQuickCamera\)/);
+  assert.match(enhancements, /quickCameraBtn\.addEventListener\('click', \(\) => openCameraCapture\('quick'\)\)/);
   assert.match(enhancements, /addMatchPhoto\(state\.matchId, file, matchContext\(state\), caption\)/);
 });
 
