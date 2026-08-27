@@ -283,7 +283,7 @@ async function renderJournal() {
   let photoLoadError = '';
   try {
     photos = await listMatchPhotos(summary.matchId);
-    if (current && photos.length === 0) {
+    if (current) {
       const recovered = await recoverMatchPhotos(summary);
       if (recovered > 0) {
         photos = await listMatchPhotos(summary.matchId);
