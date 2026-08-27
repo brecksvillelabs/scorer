@@ -23,8 +23,8 @@ export function quickFormatPresets(sport) {
   switch (sport) {
     case 'volleyball':
       return [
-        { id: 'bo3', label: 'Best of 3', note: 'Great for most youth and school matches', values: { settingBestOf: '3' } },
-        { id: 'bo5', label: 'Best of 5', note: 'Longer match format', values: { settingBestOf: '5' } }
+        { id: 'bo3', label: 'Best of 3', note: 'Shorter match', values: { settingBestOf: '3' } },
+        { id: 'bo5', label: 'Best of 5', note: 'Longer match', values: { settingBestOf: '5' } }
       ];
     case 'baseball':
       return [
@@ -58,20 +58,20 @@ export function quickFormatPresets(sport) {
       ];
     case 'basketball':
       return [
-        { id: '8', label: '8 min quarters', note: 'Common youth format', values: { settingMinutes: '8' } },
-        { id: '10', label: '10 min quarters', note: 'International-style length', values: { settingMinutes: '10' } },
+        { id: '8', label: '8 min quarters', note: 'Short format', values: { settingMinutes: '8' } },
+        { id: '10', label: '10 min quarters', note: 'Medium format', values: { settingMinutes: '10' } },
         { id: '12', label: '12 min quarters', note: 'Long format', values: { settingMinutes: '12' } }
       ];
     case 'soccer':
       return [
-        { id: '30', label: '30 min halves', note: 'Short / youth format', values: { settingMinutes: '30' } },
-        { id: '40', label: '40 min halves', note: 'Common school format', values: { settingMinutes: '40' } },
-        { id: '45', label: '45 min halves', note: 'Standard full match', values: { settingMinutes: '45' } }
+        { id: '30', label: '30 min halves', note: 'Short format', values: { settingMinutes: '30' } },
+        { id: '40', label: '40 min halves', note: 'Medium format', values: { settingMinutes: '40' } },
+        { id: '45', label: '45 min halves', note: 'Full-length format', values: { settingMinutes: '45' } }
       ];
     case 'football':
       return [
-        { id: '12', label: '12 min quarters', note: 'Common school format', values: { settingMinutes: '12' } },
-        { id: '15', label: '15 min quarters', note: 'Long format', values: { settingMinutes: '15' } }
+        { id: '12', label: '12 min quarters', note: 'Shorter quarters', values: { settingMinutes: '12' } },
+        { id: '15', label: '15 min quarters', note: 'Longer quarters', values: { settingMinutes: '15' } }
       ];
     default:
       return [];
