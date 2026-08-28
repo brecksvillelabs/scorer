@@ -5,7 +5,7 @@ import {
 import {
   nativePlatform, nativePlatformName, notificationCapability, syncGameReminders,
   cancelGameReminders, shareScheduledGame, installNativeOpenHandlers,
-  reminderDiagnostics, scheduleTestReminder, REMINDER_CHANNEL_ID
+  reminderDiagnostics, scheduleTestReminder, sendImmediateTestNotification, REMINDER_CHANNEL_ID
 } from './native-bridge.js';
 
 const $ = id => document.getElementById(id);
@@ -184,7 +184,8 @@ function renderNativeStatus() {
         <small>Channel: ${channelReady ? 'Game reminders ready' : 'will be created on first reminder'} · Timing: ${exact === 'granted' ? 'precise alarm access available' : 'Android-managed timing'}</small>
       </div>
       <div class="v041-native-actions">
-        <button type="button" data-v041-native-action="test" ${permission === 'denied' ? 'disabled' : ''}>🔔 Test in 10 sec</button>
+        <button type="button" data-v041-native-action="now" ${permission === 'denied' ? 'disabled' : ''}>🔔 Send test now</button>
+        <button type="button" data-v041-native-action="test" ${permission === 'denied' ? 'disabled' : ''}>⏱ Queue short test</button>
         <button type="button" data-v041-native-action="refresh">Refresh status</button>
       </div>`;
     host.classList.add('native');
@@ -286,6 +287,23 @@ async function handleNativeStatusAction(event) {
     return;
   }
 
+  if (action === 'now') {
+    const button = event.target.closest('button');
+    if (button) button.disabled = true;
+    try {
+      const result = await sendImmediateTestNotification();
+      reminderHealth = await reminderDiagnostics();
+      renderNativeStatus();
+      if (result.sent) toast('Immediate test sent · check your notification shade now');
+      else toast(`Immediate test blocked · permission: ${result.permission || 'unknown'}`);
+    } catch (error) {
+      reminderHealth = await reminderDiagnostics();
+      renderNativeStatus();
+      toast(`Immediate test failed: ${error?.message || 'Android could not post it'}`);
+    }
+    return;
+  }
+
   if (action === 'test') {
     const button = event.target.closest('button');
     if (button) button.disabled = true;
@@ -293,12 +311,12 @@ async function handleNativeStatusAction(event) {
       const result = await scheduleTestReminder(10);
       reminderHealth = await reminderDiagnostics();
       renderNativeStatus();
-      if (result.queued) toast('Test reminder verified · leave Scorer and wait 10 seconds');
-      else toast(`Test reminder not queued · permission: ${result.permission || 'unknown'}`);
+      if (result.queued) toast('Short test is queued in Android · delivery may be slightly delayed');
+      else toast(`Short test not queued · permission: ${result.permission || 'unknown'}`);
     } catch (error) {
       reminderHealth = await reminderDiagnostics();
       renderNativeStatus();
-      toast(`Test failed: ${error?.message || 'Android did not queue it'}`);
+      toast(`Short test failed: ${error?.message || 'Android did not queue it'}`);
     }
   }
 }
