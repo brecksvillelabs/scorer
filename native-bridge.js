@@ -1,5 +1,8 @@
 import { allReminderIds, plannedNotifications, gameTitle } from './v040-core.js';
 
+export const REMINDER_CHANNEL_ID = 'scorer-game-reminders';
+export const TEST_REMINDER_ID = 2147482991;
+
 function capacitor() { return window.Capacitor || null; }
 
 function plugin(name) {
@@ -37,29 +40,138 @@ export async function requestNotificationPermission() {
   return { native:true, granted:result?.display === 'granted', permission:result?.display || 'prompt' };
 }
 
+export async function ensureReminderChannel() {
+  const local = plugin('LocalNotifications');
+  if (!local) return { native:false, available:false };
+
+  try {
+    const listed = await local.listChannels();
+    const exists = (listed?.channels || []).some(channel => channel?.id === REMINDER_CHANNEL_ID);
+    if (!exists) {
+      await local.createChannel({
+        id: REMINDER_CHANNEL_ID,
+        name: 'Game reminders',
+        description: 'Upcoming Scorer game reminders',
+        importance: 4,
+        visibility: 1,
+        vibration: true
+      });
+    }
+    return { native:true, available:true, created:!exists };
+  } catch (error) {
+    return { native:true, available:false, error:error?.message || String(error) };
+  }
+}
+
 export async function syncGameReminders(game) {
   const local = plugin('LocalNotifications');
-  if (!local) return { native:false, scheduled:0, permission:'web' };
+  if (!local) return { native:false, requested:0, scheduled:0, pending:0, permission:'web' };
 
   const permission = await requestNotificationPermission();
-  if (!permission.granted) return { native:true, scheduled:0, permission:permission.permission };
+  if (!permission.granted) {
+    return { native:true, requested:0, scheduled:0, pending:0, permission:permission.permission };
+  }
+
+  const channel = await ensureReminderChannel();
+  if (!channel.available) {
+    throw new Error(channel.error || 'Could not create Android reminder channel');
+  }
 
   await cancelGameReminders(game);
   const items = plannedNotifications(game);
-  if (!items.length) return { native:true, scheduled:0, permission:'granted' };
+  if (!items.length) {
+    return { native:true, requested:0, scheduled:0, pending:0, permission:'granted' };
+  }
 
-  await local.schedule({
+  const scheduledResult = await local.schedule({
     notifications: items.map(item => ({
       id:item.id,
       title:item.title,
       body:item.body,
+      channelId: REMINDER_CHANNEL_ID,
+      smallIcon: 'ic_stat_scorer',
+      iconColor: '#20C8BE',
       schedule:{ at:item.at, allowWhileIdle:true },
-      extra:item.extra,
-      actionTypeId:''
+      extra:item.extra
     }))
   });
 
-  return { native:true, scheduled:items.length, permission:'granted' };
+  const expectedIds = new Set(items.map(item => item.id));
+  const pendingResult = await local.getPending();
+  const pending = (pendingResult?.notifications || []).filter(item => expectedIds.has(Number(item?.id)));
+  const returned = (scheduledResult?.notifications || []).filter(item => expectedIds.has(Number(item?.id)));
+
+  if (pending.length !== items.length) {
+    throw new Error(`Android only queued ${pending.length} of ${items.length} requested reminder${items.length === 1 ? '' : 's'}`);
+  }
+
+  return {
+    native:true,
+    requested:items.length,
+    scheduled:returned.length,
+    pending:pending.length,
+    permission:'granted',
+    nextAt:earliestPendingAt(pending)
+  };
+}
+
+export async function reminderDiagnostics(game = null) {
+  const local = plugin('LocalNotifications');
+  if (!local) return { native:false, permission:'web', pending:[], pendingForGame:[], exactAlarm:'web', channels:[] };
+
+  const permissionResult = await local.checkPermissions().catch(() => ({ display:'error' }));
+  const pendingResult = await local.getPending().catch(() => ({ notifications:[] }));
+  const channelResult = await local.listChannels().catch(() => ({ channels:[] }));
+  const exactResult = await local.checkExactNotificationSetting?.().catch?.(() => ({ exact_alarm:'unknown' })) || { exact_alarm:'unknown' };
+
+  const expected = game?.id ? new Set(allReminderIds(game).map(item => item.id)) : null;
+  const pending = pendingResult?.notifications || [];
+  return {
+    native:true,
+    permission:permissionResult?.display || 'unknown',
+    pending,
+    pendingForGame:expected ? pending.filter(item => expected.has(Number(item?.id))) : [],
+    exactAlarm:exactResult?.exact_alarm || 'unknown',
+    channels:channelResult?.channels || []
+  };
+}
+
+export async function scheduleTestReminder(seconds = 10) {
+  const local = plugin('LocalNotifications');
+  if (!local) return { native:false, queued:false, permission:'web' };
+
+  const permission = await requestNotificationPermission();
+  if (!permission.granted) return { native:true, queued:false, permission:permission.permission };
+
+  const channel = await ensureReminderChannel();
+  if (!channel.available) throw new Error(channel.error || 'Could not create Android reminder channel');
+
+  try { await local.cancel({ notifications:[{ id:TEST_REMINDER_ID }] }); } catch {}
+
+  const at = new Date(Date.now() + Math.max(5, Number(seconds) || 10) * 1000);
+  await local.schedule({
+    notifications:[{
+      id:TEST_REMINDER_ID,
+      title:'Scorer reminder test',
+      body:'If you can see this, Android reminders are working.',
+      channelId:REMINDER_CHANNEL_ID,
+      smallIcon:'ic_stat_scorer',
+      iconColor:'#20C8BE',
+      schedule:{ at, allowWhileIdle:true },
+      extra:{ test:true }
+    }]
+  });
+
+  const pendingResult = await local.getPending();
+  const queued = (pendingResult?.notifications || []).some(item => Number(item?.id) === TEST_REMINDER_ID);
+  if (!queued) throw new Error('Android did not keep the test reminder in its pending queue');
+  return { native:true, queued:true, permission:'granted', at };
+}
+
+function earliestPendingAt(pending = []) {
+  const times = pending.map(item => new Date(item?.schedule?.at || 0).getTime()).filter(Number.isFinite);
+  if (!times.length) return '';
+  return new Date(Math.min(...times)).toISOString();
 }
 
 export async function cancelGameReminders(game) {
