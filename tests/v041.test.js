@@ -28,15 +28,17 @@ test('native reminder diagnostics expose permission, pending queue, channels and
   assert.match(source, /checkExactNotificationSetting/);
 });
 
-test('device test reminder is queued for ten-second validation path', async () => {
+test('device diagnostics separate immediate notification delivery from scheduled alarm queueing', async () => {
   const bridge = await readFile(new URL('../native-bridge.js', import.meta.url), 'utf8');
   const ui = await readFile(new URL('../v040.js', import.meta.url), 'utf8');
+  assert.match(bridge, /export async function sendImmediateTestNotification/);
+  assert.match(bridge, /Scorer notifications are working/);
   assert.match(bridge, /export async function scheduleTestReminder/);
-  assert.match(bridge, /Scorer reminder test/);
   assert.match(bridge, /Android did not keep the test reminder in its pending queue/);
-  assert.match(ui, /Test in 10 sec/);
+  assert.match(ui, /Send test now/);
+  assert.match(ui, /Queue short test/);
+  assert.match(ui, /sendImmediateTestNotification\(\)/);
   assert.match(ui, /scheduleTestReminder\(10\)/);
-  assert.match(ui, /leave Scorer and wait 10 seconds/);
 });
 
 test('reminder scheduling errors are no longer overwritten by a local-save success toast', async () => {
