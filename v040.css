@@ -72,6 +72,34 @@
   background:rgba(13,148,136,.07);
 }
 .v040-native-status.native strong{color:#99f6e4}
+.v041-native-copy{
+  display:grid;
+  gap:3px;
+}
+.v041-native-copy small{
+  color:#6f849a;
+  font-size:10px;
+  line-height:1.4;
+}
+.v041-native-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:8px;
+}
+.v041-native-actions button{
+  min-height:40px;
+  padding:0 12px;
+  border:1px solid rgba(45,212,191,.22);
+  border-radius:11px;
+  background:#102136;
+  color:#dffdfa;
+  font-weight:850;
+}
+.v041-native-actions button:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
 .v040-delete-confirm{
   margin:0 0 14px;
   padding:14px;
