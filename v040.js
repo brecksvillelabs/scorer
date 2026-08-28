@@ -4,7 +4,8 @@ import {
 } from './v040-core.js';
 import {
   nativePlatform, nativePlatformName, notificationCapability, syncGameReminders,
-  cancelGameReminders, shareScheduledGame, installNativeOpenHandlers
+  cancelGameReminders, shareScheduledGame, installNativeOpenHandlers,
+  reminderDiagnostics, scheduleTestReminder, REMINDER_CHANNEL_ID
 } from './native-bridge.js';
 
 const $ = id => document.getElementById(id);
@@ -12,6 +13,7 @@ let editingId = '';
 let pendingDeleteId = '';
 let highlightId = '';
 let capability = null;
+let reminderHealth = null;
 
 boot040();
 
@@ -76,6 +78,7 @@ function installModal() {
   $('v040Close').addEventListener('click', closeSchedule);
   $('v040Add').addEventListener('click', () => openForm());
   $('v040List').addEventListener('click', handleListAction);
+  $('v040NativeStatus').addEventListener('click', handleNativeStatusAction);
   $('v040DeleteConfirm').addEventListener('click', handleDeleteConfirm);
   $('v040Form').addEventListener('submit', handleFormSubmit);
   $('v040Form').addEventListener('click', handleFormClick);
@@ -86,6 +89,7 @@ async function openSchedule() {
   $('v040ScheduleModal').classList.remove('hidden');
   $('v040ScheduleModal').setAttribute('aria-hidden','false');
   capability = await notificationCapability();
+  reminderHealth = nativePlatform() ? await reminderDiagnostics() : null;
   renderNativeStatus();
   if (highlightId) {
     setTimeout(() => {
@@ -164,8 +168,25 @@ function renderNativeStatus() {
   const host = $('v040NativeStatus');
   if (!host) return;
   if (nativePlatform()) {
-    const permission = capability?.permission || 'checking';
-    host.innerHTML = `<strong>📱 Android reminders</strong><span>${permission === 'granted' ? 'Ready — local game reminders can fire when Scorer is closed.' : permission === 'denied' ? 'Notifications are blocked. Saving a game still works; Android reminders need permission.' : 'Scorer will ask for notification permission when you save a reminder.'}</span>`;
+    const permission = reminderHealth?.permission || capability?.permission || 'checking';
+    const pending = Number(reminderHealth?.pending?.length || 0);
+    const channelReady = (reminderHealth?.channels || []).some(channel => channel?.id === REMINDER_CHANNEL_ID);
+    const exact = reminderHealth?.exactAlarm || 'unknown';
+
+    let message = 'Scorer will ask for notification permission when you save a reminder.';
+    if (permission === 'denied') message = 'Notifications are blocked for Scorer. Android cannot deliver game reminders until notifications are allowed.';
+    if (permission === 'granted') message = `Notifications allowed · ${pending} reminder${pending === 1 ? '' : 's'} currently queued in Android.`;
+
+    host.innerHTML = `
+      <div class="v041-native-copy">
+        <strong>📱 Android reminder status</strong>
+        <span>${message}</span>
+        <small>Channel: ${channelReady ? 'Game reminders ready' : 'will be created on first reminder'} · Timing: ${exact === 'granted' ? 'precise alarm access available' : 'Android-managed timing'}</small>
+      </div>
+      <div class="v041-native-actions">
+        <button type="button" data-v041-native-action="test" ${permission === 'denied' ? 'disabled' : ''}>🔔 Test in 10 sec</button>
+        <button type="button" data-v041-native-action="refresh">Refresh status</button>
+      </div>`;
     host.classList.add('native');
   } else {
     host.innerHTML = '<strong>🌐 Web / PWA</strong><span>Your schedule is saved locally here. Background device reminders become active in the Android Scorer app.</span>';
@@ -236,18 +257,50 @@ async function handleFormSubmit(event) {
   next.push(game);
   writeGames(next);
 
-  let reminderResult = { native:false, scheduled:0 };
+  let reminderResult = { native:false, requested:0, scheduled:0, pending:0 };
+  let reminderError = '';
   try { reminderResult = await syncGameReminders(game); }
-  catch (error) { toast(`Game saved · reminder error: ${error?.message || 'try again'}`); }
+  catch (error) { reminderError = error?.message || 'Android could not queue the reminder'; }
 
   closeForm();
   renderList();
   capability = await notificationCapability();
+  reminderHealth = nativePlatform() ? await reminderDiagnostics(game) : null;
   renderNativeStatus();
 
-  if (reminderResult.native && reminderResult.permission === 'denied') toast('Game saved · Android notifications are blocked');
-  else if (reminderResult.native) toast(`Game saved · ${reminderResult.scheduled} reminder${reminderResult.scheduled === 1 ? '' : 's'} scheduled`);
+  if (reminderError) toast(`Game saved · reminder failed: ${reminderError}`);
+  else if (reminderResult.native && reminderResult.permission === 'denied') toast('Game saved · Android notifications are blocked');
+  else if (reminderResult.native) toast(`Game saved · ${reminderResult.pending}/${reminderResult.requested} reminder${reminderResult.requested === 1 ? '' : 's'} verified in Android`);
   else toast('Game saved locally');
+}
+
+async function handleNativeStatusAction(event) {
+  const action = event.target.closest('[data-v041-native-action]')?.dataset.v041NativeAction;
+  if (!action) return;
+
+  if (action === 'refresh') {
+    capability = await notificationCapability();
+    reminderHealth = await reminderDiagnostics();
+    renderNativeStatus();
+    toast('Android reminder status refreshed');
+    return;
+  }
+
+  if (action === 'test') {
+    const button = event.target.closest('button');
+    if (button) button.disabled = true;
+    try {
+      const result = await scheduleTestReminder(10);
+      reminderHealth = await reminderDiagnostics();
+      renderNativeStatus();
+      if (result.queued) toast('Test reminder verified · leave Scorer and wait 10 seconds');
+      else toast(`Test reminder not queued · permission: ${result.permission || 'unknown'}`);
+    } catch (error) {
+      reminderHealth = await reminderDiagnostics();
+      renderNativeStatus();
+      toast(`Test failed: ${error?.message || 'Android did not queue it'}`);
+    }
+  }
 }
 
 function handleFormClick(event) {
