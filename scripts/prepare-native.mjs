@@ -16,7 +16,7 @@ for (const entry of await readdir(root, { withFileTypes:true })) {
 await cp(join(root, 'assets'), join(dist, 'assets'), { recursive:true });
 
 await writeFile(join(dist, 'native-build.json'), JSON.stringify({
-  version:'0.4.0',
+  version:'0.4.1',
   builtAt:new Date().toISOString(),
   source:'Scorer web core'
 }, null, 2));

@@ -146,7 +146,7 @@ test('native build preparation and Android Gradle shell are checked in', async (
   const settings = await readFile(new URL('../android/capacitor.settings.gradle', import.meta.url), 'utf8');
   assert.match(prep, /Prepared Scorer web assets for Capacitor/);
   assert.match(gradle, /applicationId "labs\.brecksville\.scorer"/);
-  assert.match(gradle, /versionName "0\.4\.0"/);
+  assert.match(gradle, /versionName "0\.4\.\d+"/);
   assert.match(settings, /capacitor-local-notifications/);
   assert.match(settings, /capacitor-share/);
 });
