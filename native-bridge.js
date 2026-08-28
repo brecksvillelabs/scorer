@@ -136,6 +136,30 @@ export async function reminderDiagnostics(game = null) {
   };
 }
 
+export async function sendImmediateTestNotification() {
+  const local = plugin('LocalNotifications');
+  if (!local) return { native:false, sent:false, permission:'web' };
+
+  const permission = await requestNotificationPermission();
+  if (!permission.granted) return { native:true, sent:false, permission:permission.permission };
+
+  const channel = await ensureReminderChannel();
+  if (!channel.available) throw new Error(channel.error || 'Could not create Android reminder channel');
+
+  await local.schedule({
+    notifications:[{
+      id:TEST_REMINDER_ID - 1,
+      title:'Scorer notifications are working',
+      body:'This is an immediate test from Scorer.',
+      channelId:REMINDER_CHANNEL_ID,
+      smallIcon:'ic_stat_scorer',
+      iconColor:'#20C8BE',
+      extra:{ test:true, immediate:true }
+    }]
+  });
+  return { native:true, sent:true, permission:'granted' };
+}
+
 export async function scheduleTestReminder(seconds = 10) {
   const local = plugin('LocalNotifications');
   if (!local) return { native:false, queued:false, permission:'web' };
