@@ -89,8 +89,6 @@ export async function syncGameReminders(game) {
       title:item.title,
       body:item.body,
       channelId: REMINDER_CHANNEL_ID,
-      smallIcon: 'ic_stat_scorer',
-      iconColor: '#20C8BE',
       schedule:{ at:item.at, allowWhileIdle:true },
       extra:item.extra
     }))
@@ -120,7 +118,9 @@ export async function reminderDiagnostics(game = null) {
   if (!local) return { native:false, permission:'web', pending:[], pendingForGame:[], exactAlarm:'web', channels:[] };
 
   const permissionResult = await local.checkPermissions().catch(() => ({ display:'error' }));
+  const enabledResult = await local.areEnabled?.().catch?.(() => ({ value:false })) || { value:false };
   const pendingResult = await local.getPending().catch(() => ({ notifications:[] }));
+  const deliveredResult = await local.getDeliveredNotifications?.().catch?.(() => ({ notifications:[] })) || { notifications:[] };
   const channelResult = await local.listChannels().catch(() => ({ channels:[] }));
   const exactResult = await local.checkExactNotificationSetting?.().catch?.(() => ({ exact_alarm:'unknown' })) || { exact_alarm:'unknown' };
 
@@ -129,7 +129,9 @@ export async function reminderDiagnostics(game = null) {
   return {
     native:true,
     permission:permissionResult?.display || 'unknown',
+    enabled:Boolean(enabledResult?.value),
     pending,
+    delivered:deliveredResult?.notifications || [],
     pendingForGame:expected ? pending.filter(item => expected.has(Number(item?.id))) : [],
     exactAlarm:exactResult?.exact_alarm || 'unknown',
     channels:channelResult?.channels || []
@@ -138,26 +140,63 @@ export async function reminderDiagnostics(game = null) {
 
 export async function sendImmediateTestNotification() {
   const local = plugin('LocalNotifications');
-  if (!local) return { native:false, sent:false, permission:'web' };
+  if (!local) return { native:false, sent:false, delivered:false, permission:'web' };
 
   const permission = await requestNotificationPermission();
-  if (!permission.granted) return { native:true, sent:false, permission:permission.permission };
+  if (!permission.granted) return { native:true, sent:false, delivered:false, permission:permission.permission };
 
-  const channel = await ensureReminderChannel();
-  if (!channel.available) throw new Error(channel.error || 'Could not create Android reminder channel');
+  const enabled = await local.areEnabled?.().catch?.(() => ({ value:false })) || { value:false };
+  if (!enabled?.value) throw new Error('Android reports notifications disabled for Scorer');
 
+  const id = TEST_REMINDER_ID - 1;
+  try { await local.removeDeliveredNotifications?.({ notifications:[{ id }] }); } catch {}
+  try { await local.cancel({ notifications:[{ id }] }); } catch {}
+
+  // Deliberately use Capacitor's built-in "default" channel and default icon.
+  // This isolates the app-level notification path from Scorer's custom reminder channel.
   await local.schedule({
     notifications:[{
-      id:TEST_REMINDER_ID - 1,
+      id,
       title:'Scorer notifications are working',
-      body:'This is an immediate test from Scorer.',
-      channelId:REMINDER_CHANNEL_ID,
-      smallIcon:'ic_stat_scorer',
-      iconColor:'#20C8BE',
-      extra:{ test:true, immediate:true }
+      body:'Android posted this notification directly from Scorer.',
+      channelId:'default',
+      extra:{ test:true, immediate:true, diagnostic:'default-channel' }
     }]
   });
-  return { native:true, sent:true, permission:'granted' };
+
+  await delay(300);
+  const deliveredResult = await local.getDeliveredNotifications?.().catch?.(() => ({ notifications:[] })) || { notifications:[] };
+  const delivered = (deliveredResult?.notifications || []).some(item => Number(item?.id) === id);
+  const channelsResult = await local.listChannels().catch(() => ({ channels:[] }));
+  const defaultChannel = (channelsResult?.channels || []).find(channel => channel?.id === 'default');
+
+  if (!delivered) {
+    const importance = defaultChannel?.importance ?? 'unknown';
+    throw new Error(`Android accepted the test call but no active notification was posted (default channel importance: ${importance})`);
+  }
+
+  return {
+    native:true,
+    sent:true,
+    delivered:true,
+    permission:'granted',
+    channelId:'default',
+    channelImportance:defaultChannel?.importance ?? null
+  };
+}
+
+export async function requestExactAlarmAccess() {
+  const local = plugin('LocalNotifications');
+  if (!local) return { native:false, exactAlarm:'web' };
+
+  const before = await local.checkExactNotificationSetting?.().catch?.(() => ({ exact_alarm:'unknown' })) || { exact_alarm:'unknown' };
+  if (before?.exact_alarm === 'granted') return { native:true, exactAlarm:'granted', changed:false };
+
+  const after = await local.changeExactNotificationSetting?.().catch?.(error => {
+    throw new Error(error?.message || 'Could not open Android precise-reminder settings');
+  });
+
+  return { native:true, exactAlarm:after?.exact_alarm || 'unknown', changed:true };
 }
 
 export async function scheduleTestReminder(seconds = 10) {
@@ -179,8 +218,6 @@ export async function scheduleTestReminder(seconds = 10) {
       title:'Scorer reminder test',
       body:'If you can see this, Android reminders are working.',
       channelId:REMINDER_CHANNEL_ID,
-      smallIcon:'ic_stat_scorer',
-      iconColor:'#20C8BE',
       schedule:{ at, allowWhileIdle:true },
       extra:{ test:true }
     }]
@@ -196,6 +233,10 @@ function earliestPendingAt(pending = []) {
   const times = pending.map(item => new Date(item?.schedule?.at || 0).getTime()).filter(Number.isFinite);
   if (!times.length) return '';
   return new Date(Math.min(...times)).toISOString();
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export async function cancelGameReminders(game) {
