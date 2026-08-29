@@ -7,11 +7,5 @@
   },
   "android": {
     "allowMixedContent": false
-  },
-  "plugins": {
-    "LocalNotifications": {
-      "smallIcon": "ic_stat_scorer",
-      "iconColor": "#20C8BE"
-    }
   }
 }

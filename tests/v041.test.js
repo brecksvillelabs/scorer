@@ -49,24 +49,21 @@ test('reminder scheduling errors are no longer overwritten by a local-save succe
   assert.doesNotMatch(ui, /catch \(error\) \{ toast\(\`Game saved · reminder error:/);
 });
 
-test('Android reminder icon, vibration and Capacitor plugin config are present', async () => {
-  const config = JSON.parse(await readFile(new URL('../capacitor.config.json', import.meta.url), 'utf8'));
+test('Android reminder vibration support remains present', async () => {
   const manifest = await readFile(new URL('../android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
   const icon = await readFile(new URL('../android/app/src/main/res/drawable/ic_stat_scorer.xml', import.meta.url), 'utf8');
-  assert.equal(config.plugins.LocalNotifications.smallIcon, 'ic_stat_scorer');
-  assert.equal(config.plugins.LocalNotifications.iconColor, '#20C8BE');
   assert.match(manifest, /android\.permission\.VIBRATE/);
   assert.match(icon, /vector/);
 });
 
-test('v0.4.1 version is aligned across web and Android shell', async () => {
+test('current version is aligned across web and Android shell', async () => {
   const version = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
   const prep = await readFile(new URL('../scripts/prepare-native.mjs', import.meta.url), 'utf8');
-  assert.equal(version, '0.4.1');
-  assert.equal(pkg.version, '0.4.1');
-  assert.match(gradle, /versionCode 401/);
-  assert.match(gradle, /versionName "0\.4\.1"/);
-  assert.match(prep, /version:'0\.4\.1'/);
+  assert.equal(version, '0.4.2');
+  assert.equal(pkg.version, '0.4.2');
+  assert.match(gradle, /versionCode 402/);
+  assert.match(gradle, /versionName "0\.4\.2"/);
+  assert.match(prep, /version:'0\.4\.2'/);
 });

@@ -5,7 +5,7 @@ import {
 import {
   nativePlatform, nativePlatformName, notificationCapability, syncGameReminders,
   cancelGameReminders, shareScheduledGame, installNativeOpenHandlers,
-  reminderDiagnostics, scheduleTestReminder, sendImmediateTestNotification, REMINDER_CHANNEL_ID
+  reminderDiagnostics, scheduleTestReminder, sendImmediateTestNotification, requestExactAlarmAccess, REMINDER_CHANNEL_ID
 } from './native-bridge.js';
 
 const $ = id => document.getElementById(id);
@@ -170,22 +170,32 @@ function renderNativeStatus() {
   if (nativePlatform()) {
     const permission = reminderHealth?.permission || capability?.permission || 'checking';
     const pending = Number(reminderHealth?.pending?.length || 0);
-    const channelReady = (reminderHealth?.channels || []).some(channel => channel?.id === REMINDER_CHANNEL_ID);
+    const delivered = Number(reminderHealth?.delivered?.length || 0);
+    const gameChannel = (reminderHealth?.channels || []).find(channel => channel?.id === REMINDER_CHANNEL_ID);
+    const defaultChannel = (reminderHealth?.channels || []).find(channel => channel?.id === 'default');
+    const channelReady = Boolean(gameChannel);
+    const channelBlocked = Number(gameChannel?.importance) === 0;
+    const defaultBlocked = Number(defaultChannel?.importance) === 0;
     const exact = reminderHealth?.exactAlarm || 'unknown';
 
     let message = 'Scorer will ask for notification permission when you save a reminder.';
-    if (permission === 'denied') message = 'Notifications are blocked for Scorer. Android cannot deliver game reminders until notifications are allowed.';
-    if (permission === 'granted') message = `Notifications allowed · ${pending} reminder${pending === 1 ? '' : 's'} currently queued in Android.`;
+    if (permission === 'denied' || reminderHealth?.enabled === false) message = 'Notifications are blocked for Scorer. Android cannot deliver game reminders until notifications are allowed.';
+    if (permission === 'granted' && reminderHealth?.enabled !== false) message = `Notifications allowed · ${pending} queued · ${delivered} currently visible in Android.`;
 
     host.innerHTML = `
       <div class="v041-native-copy">
         <strong>📱 Android reminder status</strong>
         <span>${message}</span>
-        <small>Channel: ${channelReady ? 'Game reminders ready' : 'will be created on first reminder'} · Timing: ${exact === 'granted' ? 'precise alarm access available' : 'Android-managed timing'}</small>
+        <small>
+          Default channel: ${defaultBlocked ? 'BLOCKED' : (defaultChannel ? 'enabled' : 'not reported')}
+          · Game channel: ${channelBlocked ? 'BLOCKED' : (channelReady ? 'enabled' : 'not created')}
+          · Timing: ${exact === 'granted' ? 'precise' : 'Android-managed'}
+        </small>
       </div>
       <div class="v041-native-actions">
         <button type="button" data-v041-native-action="now" ${permission === 'denied' ? 'disabled' : ''}>🔔 Send test now</button>
         <button type="button" data-v041-native-action="test" ${permission === 'denied' ? 'disabled' : ''}>⏱ Queue short test</button>
+        ${exact === 'denied' ? '<button type="button" data-v041-native-action="exact">⏰ Enable precise reminders</button>' : ''}
         <button type="button" data-v041-native-action="refresh">Refresh status</button>
       </div>`;
     host.classList.add('native');
@@ -294,12 +304,28 @@ async function handleNativeStatusAction(event) {
       const result = await sendImmediateTestNotification();
       reminderHealth = await reminderDiagnostics();
       renderNativeStatus();
-      if (result.sent) toast('Immediate test sent · check your notification shade now');
+      if (result.delivered) toast(`Android confirms the test is visible · default channel importance ${result.channelImportance ?? 'unknown'}`);
+      else if (result.sent) toast('Test call sent, but Android did not confirm delivery');
       else toast(`Immediate test blocked · permission: ${result.permission || 'unknown'}`);
     } catch (error) {
       reminderHealth = await reminderDiagnostics();
       renderNativeStatus();
       toast(`Immediate test failed: ${error?.message || 'Android could not post it'}`);
+    }
+    return;
+  }
+
+  if (action === 'exact') {
+    try {
+      const result = await requestExactAlarmAccess();
+      reminderHealth = await reminderDiagnostics();
+      renderNativeStatus();
+      if (result.exactAlarm === 'granted') toast('Precise reminders enabled');
+      else toast('Precise reminders are still disabled in Android settings');
+    } catch (error) {
+      reminderHealth = await reminderDiagnostics();
+      renderNativeStatus();
+      toast(`Could not enable precise reminders: ${error?.message || 'Android settings did not open'}`);
     }
     return;
   }

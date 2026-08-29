@@ -100,12 +100,13 @@ test('native bridge exposes LocalNotifications, Share and App without making clo
   assert.doesNotMatch(bridge, /firebase|firestore|google.?sign.?in/i);
 });
 
-test('Android shell requests notifications but deliberately avoids exact-alarm permission', async () => {
+test('Android shell requests notification permission and supports user-granted exact alarms', async () => {
   const manifest = await readFile(new URL('../android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
   const config = JSON.parse(await readFile(new URL('../capacitor.config.json', import.meta.url), 'utf8'));
   assert.match(manifest, /android\.permission\.POST_NOTIFICATIONS/);
   assert.match(manifest, /android\.permission\.CAMERA/);
-  assert.doesNotMatch(manifest, /SCHEDULE_EXACT_ALARM|USE_EXACT_ALARM/);
+  assert.match(manifest, /android\.permission\.SCHEDULE_EXACT_ALARM/);
+  assert.doesNotMatch(manifest, /USE_EXACT_ALARM/);
   assert.match(manifest, /android:scheme="scorer"/);
   assert.match(manifest, /android:host="game"/);
   assert.equal(config.appId, 'labs.brecksville.scorer');
