@@ -118,7 +118,10 @@ public class NotificationDeliveryTest {
             result.set(value);
             latch.countDown();
         }));
-        assertTrue("Timed out evaluating notification JavaScript", latch.await(5, TimeUnit.SECONDS));
+        // A cold API 35 emulator can spend several seconds starting WebView and
+        // loading the packaged modules. Keep this long enough for that first
+        // render while still failing deterministically if the bridge is stuck.
+        assertTrue("Timed out evaluating notification JavaScript", latch.await(20, TimeUnit.SECONDS));
         return result.get();
     }
 
