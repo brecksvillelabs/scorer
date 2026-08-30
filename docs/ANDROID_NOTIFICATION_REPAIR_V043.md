@@ -27,8 +27,8 @@ Two reliability assumptions were incorrect:
 1. Grant `POST_NOTIFICATIONS`.
 2. Deny `SCHEDULE_EXACT_ALARM`.
 3. Launch `MainActivity`.
-4. Import the packaged `native-bridge.js` and call `sendImmediateTestNotification()`.
-5. Require both the bridge result and Android `NotificationManager.getActiveNotifications()` to confirm delivery.
+4. Open the packaged Upcoming Games screen and press its **Send test now** control through the live WebView.
+5. Require Android `NotificationManager.getActiveNotifications()` to confirm delivery.
 
 This closes the v0.4.2 gap where JavaScript source assertions and `assembleDebug` could pass without posting a notification.
 

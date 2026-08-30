@@ -18,8 +18,6 @@ import java.io.InputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -70,23 +68,20 @@ public class NotificationDeliveryTest {
             WebView webView = activity.getBridge().getWebView();
             assertNotNull(webView);
 
-            String start = evaluate(webView,
-                "(() => {" +
-                "window.__scorerNotificationTest = 'pending';" +
-                "import('./native-bridge.js').then(async module => {" +
-                "try { window.__scorerNotificationTest = JSON.stringify(await module.sendImmediateTestNotification()); }" +
-                "catch (error) { window.__scorerNotificationTest = JSON.stringify({error:error?.message || String(error)}); }" +
-                "});" +
-                "return 'started';" +
-                "})()"
+            // Drive the packaged user path instead of importing a module from an
+            // evaluateJavascript script (Chromium gives injected dynamic imports
+            // an about:blank base URL). This clicks through v040.js into the real
+            // Capacitor LocalNotifications bridge.
+            waitForJsTrue(webView, "Boolean(document.getElementById('v040Upcoming'))", 20000);
+            evaluate(webView, "document.getElementById('v040Upcoming').click(); 'opened'");
+            waitForJsTrue(webView,
+                "(() => { const button = document.querySelector('[data-v041-native-action=now]'); return Boolean(button && !button.disabled); })()",
+                10000
             );
-            assertTrue(start.contains("started"));
-
-            JSONObject bridgeResult = waitForBridgeResult(webView);
-            assertTrue("Bridge result: " + bridgeResult, bridgeResult.optBoolean("delivered"));
+            evaluate(webView, "document.querySelector('[data-v041-native-action=now]').click(); 'sent'");
 
             boolean active = false;
-            long deadline = SystemClock.elapsedRealtime() + 3000;
+            long deadline = SystemClock.elapsedRealtime() + 10000;
             do {
                 for (StatusBarNotification notification : notificationManager.getActiveNotifications()) {
                     if (notification.getId() == IMMEDIATE_TEST_ID) {
@@ -101,14 +96,13 @@ public class NotificationDeliveryTest {
         }
     }
 
-    private JSONObject waitForBridgeResult(WebView webView) throws Exception {
-        long deadline = SystemClock.elapsedRealtime() + 10000;
+    private void waitForJsTrue(WebView webView, String script, long timeoutMs) throws Exception {
+        long deadline = SystemClock.elapsedRealtime() + timeoutMs;
         do {
-            String value = decodeJsString(evaluate(webView, "window.__scorerNotificationTest"));
-            if (value != null && !"pending".equals(value)) return new JSONObject(value);
+            if ("true".equals(evaluate(webView, script))) return;
             SystemClock.sleep(200);
         } while (SystemClock.elapsedRealtime() < deadline);
-        throw new AssertionError("Timed out waiting for the Scorer notification bridge result");
+        throw new AssertionError("Timed out waiting for Scorer's packaged notification controls");
     }
 
     private String evaluate(WebView webView, String script) throws Exception {
@@ -123,11 +117,6 @@ public class NotificationDeliveryTest {
         // render while still failing deterministically if the bridge is stuck.
         assertTrue("Timed out evaluating notification JavaScript", latch.await(20, TimeUnit.SECONDS));
         return result.get();
-    }
-
-    private String decodeJsString(String value) throws Exception {
-        if (value == null || "null".equals(value)) return null;
-        return new JSONArray("[" + value + "]").getString(0);
     }
 
     private void executeShellCommand(String command) throws IOException {

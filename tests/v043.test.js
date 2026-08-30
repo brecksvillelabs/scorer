@@ -51,7 +51,7 @@ test('Android instrumentation verifies the real Capacitor-to-notification-manage
   const instrumentation = await readFile(new URL('../android/app/src/androidTest/java/labs/brecksville/scorer/NotificationDeliveryTest.java', import.meta.url), 'utf8');
   const workflow = await readFile(new URL('../.github/workflows/android.yml', import.meta.url), 'utf8');
   assert.match(instrumentation, /SCHEDULE_EXACT_ALARM deny/);
-  assert.match(instrumentation, /sendImmediateTestNotification/);
+  assert.match(instrumentation, /data-v041-native-action=now/);
   assert.match(instrumentation, /getActiveNotifications/);
   assert.match(workflow, /connectedDebugAndroidTest/);
   assert.match(workflow, /api-level: 35/);
