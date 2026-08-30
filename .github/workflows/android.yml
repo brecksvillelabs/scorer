@@ -10,7 +10,7 @@ permissions:
 jobs:
   android-debug:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -35,9 +35,35 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace
 
+      - name: Enable KVM for Android notification QC
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify notification delivery on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: ./android/gradlew -p android connectedDebugAndroidTest --stacktrace
+
+      - name: Upload Android notification test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorer-v0.4.3-notification-test-reports
+          path: |
+            android/app/build/reports/androidTests/connected/
+            android/app/build/outputs/androidTest-results/connected/
+          if-no-files-found: warn
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: scorer-v0.4.2-debug-apk
+          name: scorer-v0.4.3-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

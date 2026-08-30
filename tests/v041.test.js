@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-test('v0.4.1 verifies scheduled reminders by reading Android pending queue', async () => {
+test('v0.4.3 distinguishes Android acceptance from Capacitor restart storage', async () => {
   const source = await readFile(new URL('../native-bridge.js', import.meta.url), 'utf8');
   assert.match(source, /await local\.schedule\(/);
   assert.match(source, /await local\.getPending\(\)/);
-  assert.match(source, /pending\.length !== items\.length/);
-  assert.match(source, /Android only queued/);
+  assert.match(source, /returned\.length !== items\.length/);
+  assert.match(source, /stored\.length !== items\.length/);
+  assert.match(source, /persisted restore list, not AlarmManager state/);
 });
 
 test('game reminders use a dedicated high-importance Android channel', async () => {
@@ -34,9 +35,9 @@ test('device diagnostics separate immediate notification delivery from scheduled
   assert.match(bridge, /export async function sendImmediateTestNotification/);
   assert.match(bridge, /Scorer notifications are working/);
   assert.match(bridge, /export async function scheduleTestReminder/);
-  assert.match(bridge, /Android did not keep the test reminder in its pending queue/);
+  assert.match(bridge, /Scorer could not retain the test reminder for delivery/);
   assert.match(ui, /Send test now/);
-  assert.match(ui, /Queue short test/);
+  assert.match(ui, /Run 10-second test/);
   assert.match(ui, /sendImmediateTestNotification\(\)/);
   assert.match(ui, /scheduleTestReminder\(10\)/);
 });
@@ -45,7 +46,8 @@ test('reminder scheduling errors are no longer overwritten by a local-save succe
   const ui = await readFile(new URL('../v040.js', import.meta.url), 'utf8');
   assert.match(ui, /let reminderError = ''/);
   assert.match(ui, /reminder failed:/);
-  assert.match(ui, /verified in Android/);
+  assert.match(ui, /Android accepted/);
+  assert.doesNotMatch(ui, /verified in Android/);
   assert.doesNotMatch(ui, /catch \(error\) \{ toast\(\`Game saved · reminder error:/);
 });
 
@@ -61,9 +63,9 @@ test('current version is aligned across web and Android shell', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
   const prep = await readFile(new URL('../scripts/prepare-native.mjs', import.meta.url), 'utf8');
-  assert.equal(version, '0.4.2');
-  assert.equal(pkg.version, '0.4.2');
-  assert.match(gradle, /versionCode 402/);
-  assert.match(gradle, /versionName "0\.4\.2"/);
-  assert.match(prep, /version:'0\.4\.2'/);
+  assert.equal(version, '0.4.3');
+  assert.equal(pkg.version, '0.4.3');
+  assert.match(gradle, /versionCode 403/);
+  assert.match(gradle, /versionName "0\.4\.3"/);
+  assert.match(prep, /version:'0\.4\.3'/);
 });

@@ -2,6 +2,8 @@ import { allReminderIds, plannedNotifications, gameTitle } from './v040-core.js'
 
 export const REMINDER_CHANNEL_ID = 'scorer-game-reminders';
 export const TEST_REMINDER_ID = 2147482991;
+const DELIVERY_POLL_INTERVAL_MS = 200;
+const DELIVERY_POLL_TIMEOUT_MS = 3000;
 
 function capacitor() { return window.Capacitor || null; }
 
@@ -46,7 +48,8 @@ export async function ensureReminderChannel() {
 
   try {
     const listed = await local.listChannels();
-    const exists = (listed?.channels || []).some(channel => channel?.id === REMINDER_CHANNEL_ID);
+    const existing = (listed?.channels || []).find(channel => channel?.id === REMINDER_CHANNEL_ID);
+    const exists = Boolean(existing);
     if (!exists) {
       await local.createChannel({
         id: REMINDER_CHANNEL_ID,
@@ -57,19 +60,33 @@ export async function ensureReminderChannel() {
         vibration: true
       });
     }
-    return { native:true, available:true, created:!exists };
+    const refreshed = exists ? existing : (await local.listChannels())?.channels?.find(channel => channel?.id === REMINDER_CHANNEL_ID);
+    if (Number(refreshed?.importance) === 0) {
+      return {
+        native:true,
+        available:false,
+        blocked:true,
+        channel:refreshed,
+        error:'Game reminders are blocked in Android notification settings'
+      };
+    }
+    // Android 7 has no channels, so a successful create/list path with no
+    // returned channel is still usable there.
+    return { native:true, available:true, created:!exists, channel:refreshed };
   } catch (error) {
     return { native:true, available:false, error:error?.message || String(error) };
   }
 }
 
-export async function syncGameReminders(game) {
+export async function syncGameReminders(game, options = {}) {
   const local = plugin('LocalNotifications');
-  if (!local) return { native:false, requested:0, scheduled:0, pending:0, permission:'web' };
+  if (!local) return { native:false, requested:0, accepted:0, stored:0, permission:'web' };
 
-  const permission = await requestNotificationPermission();
+  const permission = options.requestPermission === false
+    ? await currentNotificationPermission(local)
+    : await requestNotificationPermission();
   if (!permission.granted) {
-    return { native:true, requested:0, scheduled:0, pending:0, permission:permission.permission };
+    return { native:true, requested:0, accepted:0, stored:0, permission:permission.permission };
   }
 
   const channel = await ensureReminderChannel();
@@ -80,8 +97,11 @@ export async function syncGameReminders(game) {
   await cancelGameReminders(game);
   const items = plannedNotifications(game);
   if (!items.length) {
-    return { native:true, requested:0, scheduled:0, pending:0, permission:'granted' };
+    return { native:true, requested:0, accepted:0, stored:0, permission:'granted' };
   }
+
+  const exactAlarm = await exactAlarmPermission(local);
+  const useExact = exactAlarm === 'granted';
 
   const scheduledResult = await local.schedule({
     notifications: items.map(item => ({
@@ -90,27 +110,60 @@ export async function syncGameReminders(game) {
       body:item.body,
       channelId: REMINDER_CHANNEL_ID,
       schedule:{ at:item.at, allowWhileIdle:true },
+      // Capacitor 8.3 defaults this to true even for immediate notifications.
+      // Make the choice explicit so Android settings never opens implicitly.
+      isExactNotification:useExact,
+      isExactMandatory:false,
       extra:item.extra
     }))
   });
 
   const expectedIds = new Set(items.map(item => item.id));
   const pendingResult = await local.getPending();
-  const pending = (pendingResult?.notifications || []).filter(item => expectedIds.has(Number(item?.id)));
+  // Capacitor getPending() is its persisted restore list, not AlarmManager state.
+  // Keep it as a storage/reboot-recovery check and do not call it OS verification.
+  const stored = (pendingResult?.notifications || []).filter(item => expectedIds.has(Number(item?.id)));
   const returned = (scheduledResult?.notifications || []).filter(item => expectedIds.has(Number(item?.id)));
 
-  if (pending.length !== items.length) {
-    throw new Error(`Android only queued ${pending.length} of ${items.length} requested reminder${items.length === 1 ? '' : 's'}`);
+  if (returned.length !== items.length) {
+    throw new Error(`Android accepted only ${returned.length} of ${items.length} requested reminder${items.length === 1 ? '' : 's'}`);
+  }
+  if (stored.length !== items.length) {
+    throw new Error(`Scorer retained only ${stored.length} of ${items.length} reminder${items.length === 1 ? '' : 's'} for restart recovery`);
   }
 
   return {
     native:true,
     requested:items.length,
-    scheduled:returned.length,
-    pending:pending.length,
+    accepted:returned.length,
+    stored:stored.length,
     permission:'granted',
-    nextAt:earliestPendingAt(pending)
+    exactAlarm,
+    timing:useExact ? 'precise' : 'android-managed',
+    nextAt:earliestPendingAt(stored)
   };
+}
+
+export async function recoverUpcomingGameReminders(games = []) {
+  const local = plugin('LocalNotifications');
+  if (!local) return { native:false, recovered:0, stored:0, permission:'web' };
+
+  const permission = await currentNotificationPermission(local);
+  if (!permission.granted) return { native:true, recovered:0, stored:0, permission:permission.permission };
+
+  let recovered = 0;
+  let stored = 0;
+  const errors = [];
+  for (const game of games) {
+    try {
+      const result = await syncGameReminders(game, { requestPermission:false });
+      recovered += Number(result.accepted || 0);
+      stored += Number(result.stored || 0);
+    } catch (error) {
+      errors.push({ gameId:String(game?.id || ''), message:error?.message || String(error) });
+    }
+  }
+  return { native:true, recovered, stored, permission:'granted', errors };
 }
 
 export async function reminderDiagnostics(game = null) {
@@ -160,13 +213,14 @@ export async function sendImmediateTestNotification() {
       title:'Scorer notifications are working',
       body:'Android posted this notification directly from Scorer.',
       channelId:'default',
+      // An immediate post must never request or depend on exact-alarm access.
+      isExactNotification:false,
+      isExactMandatory:false,
       extra:{ test:true, immediate:true, diagnostic:'default-channel' }
     }]
   });
 
-  await delay(300);
-  const deliveredResult = await local.getDeliveredNotifications?.().catch?.(() => ({ notifications:[] })) || { notifications:[] };
-  const delivered = (deliveredResult?.notifications || []).some(item => Number(item?.id) === id);
+  const delivered = await waitForDeliveredNotification(local, id);
   const channelsResult = await local.listChannels().catch(() => ({ channels:[] }));
   const defaultChannel = (channelsResult?.channels || []).find(channel => channel?.id === 'default');
 
@@ -209,6 +263,11 @@ export async function scheduleTestReminder(seconds = 10) {
   const channel = await ensureReminderChannel();
   if (!channel.available) throw new Error(channel.error || 'Could not create Android reminder channel');
 
+  const exactAlarm = await exactAlarmPermission(local);
+  if (exactAlarm !== 'granted') {
+    throw new Error('Enable precise reminders before running the 10-second background test');
+  }
+
   try { await local.cancel({ notifications:[{ id:TEST_REMINDER_ID }] }); } catch {}
 
   const at = new Date(Date.now() + Math.max(5, Number(seconds) || 10) * 1000);
@@ -219,14 +278,16 @@ export async function scheduleTestReminder(seconds = 10) {
       body:'If you can see this, Android reminders are working.',
       channelId:REMINDER_CHANNEL_ID,
       schedule:{ at, allowWhileIdle:true },
+      isExactNotification:true,
+      isExactMandatory:true,
       extra:{ test:true }
     }]
   });
 
   const pendingResult = await local.getPending();
   const queued = (pendingResult?.notifications || []).some(item => Number(item?.id) === TEST_REMINDER_ID);
-  if (!queued) throw new Error('Android did not keep the test reminder in its pending queue');
-  return { native:true, queued:true, permission:'granted', at };
+  if (!queued) throw new Error('Scorer could not retain the test reminder for delivery');
+  return { native:true, queued:true, permission:'granted', exactAlarm, at };
 }
 
 function earliestPendingAt(pending = []) {
@@ -237,6 +298,26 @@ function earliestPendingAt(pending = []) {
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function currentNotificationPermission(local) {
+  const result = await local.checkPermissions().catch(() => ({ display:'error' }));
+  return { native:true, granted:result?.display === 'granted', permission:result?.display || 'error' };
+}
+
+async function exactAlarmPermission(local) {
+  const result = await local.checkExactNotificationSetting?.().catch?.(() => ({ exact_alarm:'unknown' })) || { exact_alarm:'unknown' };
+  return result?.exact_alarm || 'unknown';
+}
+
+async function waitForDeliveredNotification(local, id) {
+  const deadline = Date.now() + DELIVERY_POLL_TIMEOUT_MS;
+  do {
+    const result = await local.getDeliveredNotifications?.().catch?.(() => ({ notifications:[] })) || { notifications:[] };
+    if ((result?.notifications || []).some(item => Number(item?.id) === Number(id))) return true;
+    await delay(DELIVERY_POLL_INTERVAL_MS);
+  } while (Date.now() < deadline);
+  return false;
 }
 
 export async function cancelGameReminders(game) {
@@ -267,7 +348,7 @@ export async function shareScheduledGame(game) {
   return { native:false, shared:false, text };
 }
 
-export function installNativeOpenHandlers(onGame) {
+export function installNativeOpenHandlers(onGame, onActive) {
   const local = plugin('LocalNotifications');
   const app = plugin('App');
 
@@ -279,6 +360,10 @@ export function installNativeOpenHandlers(onGame) {
   app?.addListener?.('appUrlOpen', event => {
     const target = notificationTarget(event?.url || '');
     if (target) onGame?.(target);
+  });
+
+  app?.addListener?.('appStateChange', event => {
+    if (event?.isActive) onActive?.();
   });
 }
 

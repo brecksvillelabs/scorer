@@ -1,4 +1,4 @@
-const CACHE='scorer-v0.4.1-reminder-reliability';
+const CACHE='scorer-v0.4.3-notification-repair';
 const ASSETS=['./','./index.html','./styles.css','./v035.css','./v036.css','./v037.css','./v038.css','./v039.css','./v040.css','./app.js','./sports.js','./v035-core.js','./v036-core.js','./v037-core.js','./v038-core.js','./v039-core.js','./v039.js','./v040-core.js','./native-bridge.js','./v040.js','./baseball-core.js','./baseball-ui.js','./journal.js','./diary.js','./enhancements.js','./v031-core.js','./v031.js','./v032-core.js','./v032.js','./v033.js','./v034-core.js','./v034.js','./v034-guard.js','./manifest.webmanifest','./assets/app-icon.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

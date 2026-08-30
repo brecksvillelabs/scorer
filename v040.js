@@ -5,7 +5,8 @@ import {
 import {
   nativePlatform, nativePlatformName, notificationCapability, syncGameReminders,
   cancelGameReminders, shareScheduledGame, installNativeOpenHandlers,
-  reminderDiagnostics, scheduleTestReminder, sendImmediateTestNotification, requestExactAlarmAccess, REMINDER_CHANNEL_ID
+  reminderDiagnostics, scheduleTestReminder, sendImmediateTestNotification, requestExactAlarmAccess,
+  recoverUpcomingGameReminders, REMINDER_CHANNEL_ID, TEST_REMINDER_ID
 } from './native-bridge.js';
 
 const $ = id => document.getElementById(id);
@@ -14,6 +15,8 @@ let pendingDeleteId = '';
 let highlightId = '';
 let capability = null;
 let reminderHealth = null;
+let reminderRecovery = null;
+let lastReminderRecoveryAt = 0;
 
 boot040();
 
@@ -23,9 +26,10 @@ function boot040() {
   installNativeOpenHandlers(id => {
     highlightId = id;
     openSchedule();
-  });
+  }, () => { void recoverNativeReminders(); });
   refreshHomeBadge();
   showFreshHome();
+  setTimeout(() => { void recoverNativeReminders(); }, 250);
 }
 
 function showFreshHome() {
@@ -124,6 +128,30 @@ function writeGames(list) {
   refreshHomeBadge();
 }
 
+async function recoverNativeReminders({ force = false } = {}) {
+  if (!nativePlatform()) return { native:false, recovered:0, stored:0 };
+  if (reminderRecovery) {
+    const activeResult = await reminderRecovery;
+    if (!force) return activeResult;
+  }
+  if (!force && Date.now() - lastReminderRecoveryAt < 15000) {
+    return { native:true, recovered:0, stored:0, throttled:true };
+  }
+
+  reminderRecovery = recoverUpcomingGameReminders(upcomingGames(readGames()));
+  try {
+    const result = await reminderRecovery;
+    lastReminderRecoveryAt = Date.now();
+    if (!$('v040ScheduleModal')?.classList.contains('hidden')) {
+      reminderHealth = await reminderDiagnostics();
+      renderNativeStatus();
+    }
+    return result;
+  } finally {
+    reminderRecovery = null;
+  }
+}
+
 function renderList() {
   const host = $('v040List');
   const games = readGames();
@@ -169,7 +197,7 @@ function renderNativeStatus() {
   if (!host) return;
   if (nativePlatform()) {
     const permission = reminderHealth?.permission || capability?.permission || 'checking';
-    const pending = Number(reminderHealth?.pending?.length || 0);
+    const stored = Number(reminderHealth?.pending?.length || 0);
     const delivered = Number(reminderHealth?.delivered?.length || 0);
     const gameChannel = (reminderHealth?.channels || []).find(channel => channel?.id === REMINDER_CHANNEL_ID);
     const defaultChannel = (reminderHealth?.channels || []).find(channel => channel?.id === 'default');
@@ -180,7 +208,8 @@ function renderNativeStatus() {
 
     let message = 'Scorer will ask for notification permission when you save a reminder.';
     if (permission === 'denied' || reminderHealth?.enabled === false) message = 'Notifications are blocked for Scorer. Android cannot deliver game reminders until notifications are allowed.';
-    if (permission === 'granted' && reminderHealth?.enabled !== false) message = `Notifications allowed · ${pending} queued · ${delivered} currently visible in Android.`;
+    if (permission === 'granted' && reminderHealth?.enabled !== false) message = `Notifications allowed · ${stored} reminder schedule${stored === 1 ? '' : 's'} saved · ${delivered} currently visible.`;
+    if (channelBlocked) message = 'Android is blocking Scorer’s Game reminders channel. Allow that channel in Scorer notification settings.';
 
     host.innerHTML = `
       <div class="v041-native-copy">
@@ -189,12 +218,12 @@ function renderNativeStatus() {
         <small>
           Default channel: ${defaultBlocked ? 'BLOCKED' : (defaultChannel ? 'enabled' : 'not reported')}
           · Game channel: ${channelBlocked ? 'BLOCKED' : (channelReady ? 'enabled' : 'not created')}
-          · Timing: ${exact === 'granted' ? 'precise' : 'Android-managed'}
+          · Timing: ${exact === 'granted' ? 'precise' : 'approximate until enabled'}
         </small>
       </div>
       <div class="v041-native-actions">
         <button type="button" data-v041-native-action="now" ${permission === 'denied' ? 'disabled' : ''}>🔔 Send test now</button>
-        <button type="button" data-v041-native-action="test" ${permission === 'denied' ? 'disabled' : ''}>⏱ Queue short test</button>
+        <button type="button" data-v041-native-action="test" ${(permission === 'denied' || exact !== 'granted' || channelBlocked) ? 'disabled' : ''}>⏱ Run 10-second test</button>
         ${exact === 'denied' ? '<button type="button" data-v041-native-action="exact">⏰ Enable precise reminders</button>' : ''}
         <button type="button" data-v041-native-action="refresh">Refresh status</button>
       </div>`;
@@ -268,7 +297,7 @@ async function handleFormSubmit(event) {
   next.push(game);
   writeGames(next);
 
-  let reminderResult = { native:false, requested:0, scheduled:0, pending:0 };
+  let reminderResult = { native:false, requested:0, accepted:0, stored:0 };
   let reminderError = '';
   try { reminderResult = await syncGameReminders(game); }
   catch (error) { reminderError = error?.message || 'Android could not queue the reminder'; }
@@ -281,7 +310,8 @@ async function handleFormSubmit(event) {
 
   if (reminderError) toast(`Game saved · reminder failed: ${reminderError}`);
   else if (reminderResult.native && reminderResult.permission === 'denied') toast('Game saved · Android notifications are blocked');
-  else if (reminderResult.native) toast(`Game saved · ${reminderResult.pending}/${reminderResult.requested} reminder${reminderResult.requested === 1 ? '' : 's'} verified in Android`);
+  else if (reminderResult.native && reminderResult.requested === 0 && reminders.length) toast('Game saved · the selected reminder times have already passed');
+  else if (reminderResult.native) toast(`Game saved · Android accepted ${reminderResult.accepted}/${reminderResult.requested} reminder${reminderResult.requested === 1 ? '' : 's'} · ${reminderResult.timing || 'Android-managed'} timing`);
   else toast('Game saved locally');
 }
 
@@ -290,6 +320,7 @@ async function handleNativeStatusAction(event) {
   if (!action) return;
 
   if (action === 'refresh') {
+    await recoverNativeReminders({ force:true });
     capability = await notificationCapability();
     reminderHealth = await reminderDiagnostics();
     renderNativeStatus();
@@ -318,9 +349,10 @@ async function handleNativeStatusAction(event) {
   if (action === 'exact') {
     try {
       const result = await requestExactAlarmAccess();
+      const recovery = result.exactAlarm === 'granted' ? await recoverNativeReminders({ force:true }) : null;
       reminderHealth = await reminderDiagnostics();
       renderNativeStatus();
-      if (result.exactAlarm === 'granted') toast('Precise reminders enabled');
+      if (result.exactAlarm === 'granted') toast(`Precise reminders enabled · ${Number(recovery?.recovered || 0)} reminder${Number(recovery?.recovered || 0) === 1 ? '' : 's'} re-armed`);
       else toast('Precise reminders are still disabled in Android settings');
     } catch (error) {
       reminderHealth = await reminderDiagnostics();
@@ -337,7 +369,10 @@ async function handleNativeStatusAction(event) {
       const result = await scheduleTestReminder(10);
       reminderHealth = await reminderDiagnostics();
       renderNativeStatus();
-      if (result.queued) toast('Short test is queued in Android · delivery may be slightly delayed');
+      if (result.queued) {
+        toast('10-second background test scheduled · watch for the Android notification');
+        setTimeout(() => { void verifyBackgroundTestDelivery(); }, 12000);
+      }
       else toast(`Short test not queued · permission: ${result.permission || 'unknown'}`);
     } catch (error) {
       reminderHealth = await reminderDiagnostics();
@@ -345,6 +380,13 @@ async function handleNativeStatusAction(event) {
       toast(`Short test failed: ${error?.message || 'Android did not queue it'}`);
     }
   }
+}
+
+async function verifyBackgroundTestDelivery() {
+  reminderHealth = await reminderDiagnostics();
+  renderNativeStatus();
+  const delivered = (reminderHealth?.delivered || []).some(item => Number(item?.id) === TEST_REMINDER_ID);
+  toast(delivered ? 'Android delivered the 10-second reminder successfully' : 'The test is not visible yet · tap Refresh status after checking notifications');
 }
 
 function handleFormClick(event) {
