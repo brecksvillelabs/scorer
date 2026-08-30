@@ -4,14 +4,16 @@
 
 The v0.4.2 APK contained the required Android notification permission, local-notification plugin, alarm receiver, boot restore receiver and channels. It still did not prove real device delivery.
 
-Two reliability assumptions were incorrect:
+Three reliability assumptions were incorrect:
 
-1. Capacitor Local Notifications 8.3.1 defaults `isExactNotification` to `true`. Scorer's immediate test did not override that default, so a notification that should post now could enter Android's exact-alarm settings flow.
-2. Capacitor `getPending()` reads the plugin's persisted restore records. It is useful for restart recovery, but it is not a query of Android `AlarmManager` registrations and must not be described as OS delivery verification.
+1. Scorer's plain-module bridge required `window.Capacitor.registerPlugin()`, but Capacitor's unbundled Android runtime exports its generated proxies at `window.Capacitor.Plugins`. The missing method made every native-plugin lookup fall back to the web path before Android was called.
+2. Capacitor Local Notifications 8.3.1 defaults `isExactNotification` to `true`. Scorer's immediate test did not override that default, so a notification that should post now could enter Android's exact-alarm settings flow.
+3. Capacitor `getPending()` reads the plugin's persisted restore records. It is useful for restart recovery, but it is not a query of Android `AlarmManager` registrations and must not be described as OS delivery verification.
 
 ## v0.4.3 behavior
 
 - Immediate notifications explicitly set `isExactNotification:false` and never depend on exact-alarm access.
+- Native calls use the plugin proxies actually injected by Capacitor's Android runtime, with `registerPlugin()` retained only as a bundled-runtime fallback.
 - Immediate delivery is polled through `getDeliveredNotifications()` for up to three seconds and must appear in Android's active notification list.
 - Game reminders explicitly choose precise timing only when Android reports exact-alarm access as granted.
 - Without exact access, game reminders use Android-managed timing without silently opening Settings.

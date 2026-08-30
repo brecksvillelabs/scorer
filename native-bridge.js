@@ -9,7 +9,16 @@ function capacitor() { return window.Capacitor || null; }
 
 function plugin(name) {
   const cap = capacitor();
-  if (!cap?.isNativePlatform?.() || !cap?.isPluginAvailable?.(name) || typeof cap.registerPlugin !== 'function') return null;
+  if (!cap?.isNativePlatform?.() || !cap?.isPluginAvailable?.(name)) return null;
+
+  // Capacitor's unbundled Android bridge exports generated plugin proxies here.
+  // registerPlugin() belongs to @capacitor/core's JS module and is not present on
+  // the raw window.Capacitor object used by Scorer's plain-module shell.
+  const nativeProxy = cap?.Plugins?.[name];
+  if (nativeProxy) return nativeProxy;
+
+  // Keep compatibility with bundled/web runtimes that do expose registerPlugin.
+  if (typeof cap.registerPlugin !== 'function') return null;
   try { return cap.registerPlugin(name); } catch { return null; }
 }
 

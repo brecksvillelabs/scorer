@@ -14,6 +14,13 @@ test('immediate notification cannot enter the exact-alarm settings flow', async 
   assert.doesNotMatch(immediate, /changeExactNotificationSetting/);
 });
 
+test('plain-module Android shell uses Capacitor native plugin proxies', async () => {
+  const bridge = await readFile(new URL('../native-bridge.js', import.meta.url), 'utf8');
+  assert.match(bridge, /cap\?\.Plugins\?\.\[name\]/);
+  assert.match(bridge, /if \(nativeProxy\) return nativeProxy/);
+  assert.match(bridge, /typeof cap\.registerPlugin !== 'function'/);
+});
+
 test('game reminders make exact versus Android-managed timing explicit', async () => {
   const bridge = await readFile(new URL('../native-bridge.js', import.meta.url), 'utf8');
   assert.match(bridge, /const useExact = exactAlarm === 'granted'/);
