@@ -55,7 +55,7 @@ test('blocked game channel is surfaced instead of silently accepting reminders',
 });
 
 test('Android instrumentation verifies the real Capacitor-to-notification-manager path', async () => {
-  const instrumentation = await readFile(new URL('../android/app/src/androidTest/java/labs/brecksville/scorer/NotificationDeliveryTest.java', import.meta.url), 'utf8');
+  const instrumentation = await readFile(new URL('../android/app/src/androidTest/java/com/brecksvillelabs/scorer/NotificationDeliveryTest.java', import.meta.url), 'utf8');
   const workflow = await readFile(new URL('../.github/workflows/android.yml', import.meta.url), 'utf8');
   assert.match(instrumentation, /SCHEDULE_EXACT_ALARM deny/);
   assert.match(instrumentation, /data-v041-native-action=now/);
@@ -64,16 +64,16 @@ test('Android instrumentation verifies the real Capacitor-to-notification-manage
   assert.match(workflow, /api-level: 35/);
 });
 
-test('v0.4.3 version is aligned across release surfaces', async () => {
+test('v0.5.0 version is aligned across release surfaces', async () => {
   const version = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
   const prep = await readFile(new URL('../scripts/prepare-native.mjs', import.meta.url), 'utf8');
   const workflow = await readFile(new URL('../.github/workflows/android.yml', import.meta.url), 'utf8');
-  assert.equal(version, '0.4.3');
-  assert.equal(pkg.version, '0.4.3');
-  assert.match(gradle, /versionCode 403/);
-  assert.match(gradle, /versionName "0\.4\.3"/);
-  assert.match(prep, /version:'0\.4\.3'/);
-  assert.match(workflow, /scorer-v0\.4\.3-debug-apk/);
+  assert.equal(version, '0.5.0');
+  assert.equal(pkg.version, version);
+  assert.match(gradle, /versionCode 500/);
+  assert.match(gradle, /versionName "0\.5\.0"/);
+  assert.match(prep, /const version =/);
+  assert.match(workflow, /scorer-v0\.5\.0-debug-apk/);
 });

@@ -1,4 +1,4 @@
-package labs.brecksville.scorer;
+package com.brecksvillelabs.scorer;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -26,7 +26,7 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class NotificationDeliveryTest {
 
-    private static final String PACKAGE_NAME = "labs.brecksville.scorer";
+    private static final String PACKAGE_NAME = "com.brecksvillelabs.scorer";
     private static final int IMMEDIATE_TEST_ID = 2147482990;
     private NotificationManager notificationManager;
 

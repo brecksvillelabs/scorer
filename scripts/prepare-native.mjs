@@ -1,9 +1,10 @@
-import { cp, mkdir, readdir, rm, copyFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, rm, copyFile, writeFile, readFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 
 const root = process.cwd();
 const dist = join(root, 'dist');
 const allowed = new Set(['.html', '.js', '.css', '.webmanifest']);
+const version = (await readFile(join(root, 'VERSION'), 'utf8')).trim();
 
 await rm(dist, { recursive:true, force:true });
 await mkdir(dist, { recursive:true });
@@ -16,7 +17,7 @@ for (const entry of await readdir(root, { withFileTypes:true })) {
 await cp(join(root, 'assets'), join(dist, 'assets'), { recursive:true });
 
 await writeFile(join(dist, 'native-build.json'), JSON.stringify({
-  version:'0.4.3',
+  version,
   builtAt:new Date().toISOString(),
   source:'Scorer web core'
 }, null, 2));

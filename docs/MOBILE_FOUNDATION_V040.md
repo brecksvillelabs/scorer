@@ -19,7 +19,7 @@ Scorer web core
 
 Android application ID:
 
-`labs.brecksville.scorer`
+`com.brecksvillelabs.scorer`
 
 Capacitor app name:
 

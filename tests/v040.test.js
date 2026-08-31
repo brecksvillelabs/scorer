@@ -109,7 +109,7 @@ test('Android shell requests notification permission and supports user-granted e
   assert.doesNotMatch(manifest, /USE_EXACT_ALARM/);
   assert.match(manifest, /android:scheme="scorer"/);
   assert.match(manifest, /android:host="game"/);
-  assert.equal(config.appId, 'labs.brecksville.scorer');
+  assert.equal(config.appId, 'com.brecksvillelabs.scorer');
   assert.equal(config.webDir, 'dist');
 });
 
@@ -146,8 +146,8 @@ test('native build preparation and Android Gradle shell are checked in', async (
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
   const settings = await readFile(new URL('../android/capacitor.settings.gradle', import.meta.url), 'utf8');
   assert.match(prep, /Prepared Scorer web assets for Capacitor/);
-  assert.match(gradle, /applicationId "labs\.brecksville\.scorer"/);
-  assert.match(gradle, /versionName "0\.4\.\d+"/);
+  assert.match(gradle, /applicationId "com\.brecksvillelabs\.scorer"/);
+  assert.match(gradle, /versionName "0\.\d+\.\d+"/);
   assert.match(settings, /capacitor-local-notifications/);
   assert.match(settings, /capacitor-share/);
 });

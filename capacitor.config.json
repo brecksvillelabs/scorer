@@ -1,5 +1,5 @@
 {
-  "appId": "labs.brecksville.scorer",
+  "appId": "com.brecksvillelabs.scorer",
   "appName": "Scorer",
   "webDir": "dist",
   "server": {

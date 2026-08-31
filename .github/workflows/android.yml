@@ -23,8 +23,8 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Install pinned Capacitor dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install locked Capacitor dependencies
+        run: npm ci --no-audit --no-fund
 
       - name: Prepare and sync native web assets
         run: npm run native:sync
@@ -55,7 +55,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scorer-v0.4.3-notification-test-reports
+          name: scorer-v0.5.0-notification-test-reports
           path: |
             android/app/build/reports/androidTests/connected/
             android/app/build/outputs/androidTest-results/connected/
@@ -64,6 +64,6 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: scorer-v0.4.3-debug-apk
+          name: scorer-v0.5.0-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

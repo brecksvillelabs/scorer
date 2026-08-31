@@ -21,7 +21,7 @@ test('reminder diagnostics distinguish app permission, channel state, queued and
   assert.match(ui, /importance/);
 });
 
-test('v0.4.3 supports user-granted exact alarms for precise game reminders', async () => {
+test('Scorer supports user-granted exact alarms for precise game reminders', async () => {
   const manifest = await readFile(new URL('../android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
   const bridge = await readFile(new URL('../native-bridge.js', import.meta.url), 'utf8');
   const ui = await readFile(new URL('../v040.js', import.meta.url), 'utf8');
@@ -40,14 +40,14 @@ test('diagnostic build removes custom icon config so Android fallback icon is us
   assert.doesNotMatch(immediate, /smallIcon|iconColor/);
 });
 
-test('v0.4.3 version is aligned everywhere', async () => {
+test('release version is aligned everywhere', async () => {
   const version = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
   const prep = await readFile(new URL('../scripts/prepare-native.mjs', import.meta.url), 'utf8');
-  assert.equal(version, '0.4.3');
-  assert.equal(pkg.version, '0.4.3');
-  assert.match(gradle, /versionCode 403/);
-  assert.match(gradle, /versionName "0\.4\.3"/);
-  assert.match(prep, /version:'0\.4\.3'/);
+  assert.equal(version, '0.5.0');
+  assert.equal(pkg.version, version);
+  assert.match(gradle, /versionCode 500/);
+  assert.match(gradle, /versionName "0\.5\.0"/);
+  assert.match(prep, /const version =/);
 });

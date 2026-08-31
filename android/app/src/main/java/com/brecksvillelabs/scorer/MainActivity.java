@@ -1,4 +1,4 @@
-package labs.brecksville.scorer;
+package com.brecksvillelabs.scorer;
 
 import com.getcapacitor.BridgeActivity;
 

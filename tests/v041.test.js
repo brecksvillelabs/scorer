@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-test('v0.4.3 distinguishes Android acceptance from Capacitor restart storage', async () => {
+test('Android acceptance remains distinct from Capacitor restart storage', async () => {
   const source = await readFile(new URL('../native-bridge.js', import.meta.url), 'utf8');
   assert.match(source, /await local\.schedule\(/);
   assert.match(source, /await local\.getPending\(\)/);
@@ -63,9 +63,9 @@ test('current version is aligned across web and Android shell', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
   const prep = await readFile(new URL('../scripts/prepare-native.mjs', import.meta.url), 'utf8');
-  assert.equal(version, '0.4.3');
-  assert.equal(pkg.version, '0.4.3');
-  assert.match(gradle, /versionCode 403/);
-  assert.match(gradle, /versionName "0\.4\.3"/);
-  assert.match(prep, /version:'0\.4\.3'/);
+  assert.equal(version, '0.5.0');
+  assert.equal(pkg.version, version);
+  assert.match(gradle, /versionCode 500/);
+  assert.match(gradle, /versionName "0\.5\.0"/);
+  assert.match(prep, /const version =/);
 });

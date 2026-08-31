@@ -58,6 +58,13 @@ The v0.2 regression suite covers volleyball set logic, tennis deuce/advantage an
 
 GitHub Actions runs CI and deploys `main` to GitHub Pages.
 
+## Play Store preparation
+
+The `release/play-store-v0.5.0` line is the first Google Play preparation
+release. Its permanent Android application ID is
+`com.brecksvillelabs.scorer`. Version 0.5.0 remains a closed-testing candidate;
+the first public production release is reserved for version 1.0.0.
+
 
 ## v0.3 — team library and game journal
 
