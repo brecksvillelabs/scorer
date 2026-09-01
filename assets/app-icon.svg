@@ -1,8 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#67e8f9"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
-  <rect width="512" height="512" rx="116" fill="#07101d"/>
-  <rect x="70" y="84" width="372" height="344" rx="64" fill="url(#g)" opacity=".17" stroke="#67e8f9" stroke-width="12"/>
-  <path d="M126 178h260M126 334h260M256 132v248" stroke="#e2e8f0" stroke-width="16" stroke-linecap="round" opacity=".72"/>
-  <text x="188" y="286" font-family="Arial, sans-serif" font-size="112" font-weight="900" text-anchor="middle" fill="#fff">8</text>
-  <text x="324" y="286" font-family="Arial, sans-serif" font-size="112" font-weight="900" text-anchor="middle" fill="#fff">6</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Scorer</title>
+  <desc id="desc">An abstract S formed by two opposing scoreboard ribbons.</desc>
+  <defs>
+    <radialGradient id="bg" cx=".18" cy=".06" r="1.1">
+      <stop stop-color="#102B43"/>
+      <stop offset=".62" stop-color="#07111F"/>
+      <stop offset="1" stop-color="#040A12"/>
+    </radialGradient>
+    <linearGradient id="top" x1="78" y1="82" x2="418" y2="288" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#31E6C6"/>
+      <stop offset="1" stop-color="#0EA5C6"/>
+    </linearGradient>
+    <linearGradient id="bottom" x1="94" y1="430" x2="434" y2="224" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="94" cy="78" r="148" fill="#2DD4BF" opacity=".07"/>
+  <circle cx="438" cy="438" r="172" fill="#6366F1" opacity=".09"/>
+  <path d="M382 82H202C126 82 78 126 78 187s48 101 124 101h111c20 0 36-16 36-36s-16-36-36-36H202c-29 0-50-12-50-31s21-31 50-31h180c20 0 36-16 36-36s-16-36-36-36Z" fill="url(#top)"/>
+  <path d="M130 430h180c76 0 124-44 124-105s-48-101-124-101H199c-20 0-36 16-36 36s16 36 36 36h111c29 0 50 12 50 31s-21 31-50 31H130c-20 0-36 16-36 36s16 36 36 36Z" fill="url(#bottom)"/>
+  <g fill="#D8FFFA" opacity=".95">
+    <circle cx="330" cy="118" r="9"/><circle cx="358" cy="118" r="9"/><circle cx="386" cy="118" r="9"/>
+  </g>
+  <g fill="#DDE7FF" opacity=".95">
+    <circle cx="126" cy="394" r="9"/><circle cx="154" cy="394" r="9"/><circle cx="182" cy="394" r="9"/>
+  </g>
+  <circle cx="256" cy="256" r="31" fill="#FF624A"/>
+  <circle cx="247" cy="247" r="9" fill="#FFB3A7" opacity=".78"/>
 </svg>
