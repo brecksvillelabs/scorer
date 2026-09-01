@@ -60,10 +60,10 @@ GitHub Actions runs CI and deploys `main` to GitHub Pages.
 
 ## Play Store preparation
 
-The `release/play-store-v0.5.0` line is the first Google Play preparation
-release. Its permanent Android application ID is
-`com.brecksvillelabs.scorer`. Version 0.5.0 remains a closed-testing candidate;
-the first public production release is reserved for version 1.0.0.
+The v0.5.x line prepares Scorer for Google Play. Its permanent Android
+application ID is `com.brecksvillelabs.scorer`. Version 0.5.1 adds the signed
+release and Android 16 QC pipeline; the first public production release is
+reserved for version 1.0.0.
 
 
 ## v0.3 — team library and game journal

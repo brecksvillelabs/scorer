@@ -1,0 +1,79 @@
+name: Build Play AAB
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  play-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SCORER_UPLOAD_KEYSTORE_PATH: ${{ runner.temp }}/scorer-upload.jks
+      SCORER_UPLOAD_KEYSTORE_BASE64: ${{ secrets.SCORER_UPLOAD_KEYSTORE_BASE64 }}
+      SCORER_UPLOAD_STORE_PASSWORD: ${{ secrets.SCORER_UPLOAD_STORE_PASSWORD }}
+      SCORER_UPLOAD_KEY_ALIAS: ${{ secrets.SCORER_UPLOAD_KEY_ALIAS }}
+      SCORER_UPLOAD_KEY_PASSWORD: ${{ secrets.SCORER_UPLOAD_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Require all upload-signing secrets
+        run: |
+          set -euo pipefail
+          test -n "$SCORER_UPLOAD_KEYSTORE_BASE64" || { echo "::error::Missing SCORER_UPLOAD_KEYSTORE_BASE64"; exit 1; }
+          test -n "$SCORER_UPLOAD_STORE_PASSWORD" || { echo "::error::Missing SCORER_UPLOAD_STORE_PASSWORD"; exit 1; }
+          test -n "$SCORER_UPLOAD_KEY_ALIAS" || { echo "::error::Missing SCORER_UPLOAD_KEY_ALIAS"; exit 1; }
+          test -n "$SCORER_UPLOAD_KEY_PASSWORD" || { echo "::error::Missing SCORER_UPLOAD_KEY_PASSWORD"; exit 1; }
+
+      - name: Materialize upload keystore securely
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$SCORER_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$SCORER_UPLOAD_KEYSTORE_PATH"
+          test -s "$SCORER_UPLOAD_KEYSTORE_PATH"
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run release regression suite
+        run: npm run check
+
+      - name: Prepare native assets
+        run: npm run native:sync
+
+      - name: Build signed Play bundle
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew bundleRelease --stacktrace
+
+      - name: Verify and fingerprint Play bundle
+        run: |
+          set -euo pipefail
+          bundle="android/app/build/outputs/bundle/release/app-release.aab"
+          test -s "$bundle"
+          unzip -t "$bundle"
+          jarsigner -verify -verbose -certs "$bundle" | tee "$RUNNER_TEMP/scorer-play-jarsigner.txt"
+          grep -q "jar verified" "$RUNNER_TEMP/scorer-play-jarsigner.txt"
+          sha256sum "$bundle" > "$bundle.sha256"
+
+      - name: Upload Play Console bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorer-v0.5.1-play-aab
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/bundle/release/app-release.aab.sha256
+          if-no-files-found: error
+          retention-days: 30

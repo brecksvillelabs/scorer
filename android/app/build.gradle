@@ -1,5 +1,29 @@
 apply plugin: 'com.android.application'
 
+def scorerSigningValue = { String name ->
+    def environmentValue = System.getenv(name)
+    if (environmentValue != null && !environmentValue.trim().isEmpty()) {
+        return environmentValue
+    }
+    def propertyValue = project.findProperty(name)
+    if (propertyValue != null && !propertyValue.toString().trim().isEmpty()) {
+        return propertyValue.toString()
+    }
+    return null
+}
+
+def scorerKeystorePath = scorerSigningValue('SCORER_UPLOAD_KEYSTORE_PATH')
+def scorerKeystorePassword = scorerSigningValue('SCORER_UPLOAD_STORE_PASSWORD')
+def scorerKeyAlias = scorerSigningValue('SCORER_UPLOAD_KEY_ALIAS')
+def scorerKeyPassword = scorerSigningValue('SCORER_UPLOAD_KEY_PASSWORD')
+def scorerSigningValues = [scorerKeystorePath, scorerKeystorePassword, scorerKeyAlias, scorerKeyPassword]
+def scorerAnySigningValue = scorerSigningValues.any { it != null }
+def scorerReleaseSigningConfigured = scorerSigningValues.every { it != null }
+
+if (scorerAnySigningValue && !scorerReleaseSigningConfigured) {
+    throw new GradleException('Incomplete Scorer upload signing configuration. Provide all four SCORER_UPLOAD_* values.')
+}
+
 android {
     namespace = "com.brecksvillelabs.scorer"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,19 +32,47 @@ android {
         applicationId "com.brecksvillelabs.scorer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 500
-        versionName "0.5.0"
+        versionCode 501
+        versionName "0.5.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
 
+    signingConfigs {
+        release {
+            if (scorerReleaseSigningConfigured) {
+                storeFile file(scorerKeystorePath)
+                storePassword scorerKeystorePassword
+                keyAlias scorerKeyAlias
+                keyPassword scorerKeyPassword
+            }
+        }
+    }
+
+    testBuildType = (project.findProperty('scorerTestBuildType') ?: 'debug').toString()
+
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def needsReleaseSigning = taskGraph.allTasks.any { task ->
+        task.project == project && task.name.toLowerCase().contains('release') &&
+            (task.name.toLowerCase().contains('bundle') ||
+             task.name.toLowerCase().contains('package') ||
+             task.name.toLowerCase().contains('assemble') ||
+             task.name.toLowerCase().contains('connected') ||
+             task.name.toLowerCase().contains('install'))
+    }
+    if (needsReleaseSigning && !scorerReleaseSigningConfigured) {
+        throw new GradleException('Release signing is required. Supply the Scorer upload keystore through environment variables or Gradle properties.')
     }
 }
 
