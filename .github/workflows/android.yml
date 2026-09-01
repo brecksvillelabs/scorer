@@ -72,7 +72,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      SCORER_UPLOAD_KEYSTORE_PATH: ${{ runner.temp }}/scorer-ci-only-release.jks
       SCORER_UPLOAD_STORE_PASSWORD: ci-only-not-for-play
       SCORER_UPLOAD_KEY_ALIAS: scorer-ci-only
       SCORER_UPLOAD_KEY_PASSWORD: ci-only-not-for-play
@@ -93,8 +92,10 @@ jobs:
 
       - name: Generate disposable CI-only signing key
         run: |
+          keystore_path="$RUNNER_TEMP/scorer-ci-only-release.jks"
+          echo "SCORER_UPLOAD_KEYSTORE_PATH=$keystore_path" >> "$GITHUB_ENV"
           keytool -genkeypair -noprompt \
-            -keystore "$SCORER_UPLOAD_KEYSTORE_PATH" \
+            -keystore "$keystore_path" \
             -storepass "$SCORER_UPLOAD_STORE_PASSWORD" \
             -keypass "$SCORER_UPLOAD_KEY_PASSWORD" \
             -alias "$SCORER_UPLOAD_KEY_ALIAS" \
