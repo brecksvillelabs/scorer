@@ -10,3 +10,11 @@ android/**/build/
 android/app/src/main/assets/
 android/app/src/main/res/xml/config.xml
 android/capacitor-cordova-android-plugins/
+
+# Release signing material must never enter source control.
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+!.env.example

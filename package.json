@@ -1,6 +1,6 @@
 {
   "name": "scorer",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "private": true,
   "scripts": {
@@ -9,7 +9,8 @@
     "native:prepare": "node scripts/prepare-native.mjs",
     "native:sync": "npm run native:prepare && npx cap sync android",
     "native:open": "npm run native:sync && npx cap open android",
-    "native:build:android": "npm run native:sync && cd android && ./gradlew assembleDebug"
+    "native:build:android": "npm run native:sync && cd android && ./gradlew assembleDebug",
+    "native:bundle:android": "npm run native:sync && cd android && ./gradlew bundleRelease"
   },
   "engines": {
     "node": ">=20"

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const read = relative => readFile(new URL(`../${relative}`, import.meta.url), 'utf8');
 
-test('v0.5.0 locks the permanent Play application identity', async () => {
+test('Play preparation locks the permanent application identity', async () => {
   const config = JSON.parse(await read('capacitor.config.json'));
   const gradle = await read('android/app/build.gradle');
   const strings = await read('android/app/src/main/res/values/strings.xml');
@@ -20,16 +20,16 @@ test('v0.5.0 locks the permanent Play application identity', async () => {
   assert.match(instrumentation, /PACKAGE_NAME = "com\.brecksvillelabs\.scorer"/);
 });
 
-test('v0.5.0 release numbering and Android 16 target are aligned', async () => {
+test('current release numbering and Android 16 target are aligned', async () => {
   const version = (await read('VERSION')).trim();
   const pkg = JSON.parse(await read('package.json'));
   const gradle = await read('android/app/build.gradle');
   const variables = await read('android/variables.gradle');
 
-  assert.equal(version, '0.5.0');
+  assert.equal(version, '0.5.1');
   assert.equal(pkg.version, version);
-  assert.match(gradle, /versionCode 500/);
-  assert.match(gradle, /versionName "0\.5\.0"/);
+  assert.match(gradle, /versionCode 501/);
+  assert.match(gradle, /versionName "0\.5\.1"/);
   assert.match(variables, /compileSdkVersion = 36/);
   assert.match(variables, /targetSdkVersion = 36/);
 });
@@ -42,7 +42,7 @@ test('release preparation uses locked Node installs and ignores generated native
 
   assert.match(ci, /npm ci --no-audit --no-fund/);
   assert.match(android, /npm ci --no-audit --no-fund/);
-  assert.equal(lock.packages[''].version, '0.5.0');
+  assert.equal(lock.packages[''].version, '0.5.1');
   assert.match(ignored, /android\/app\/src\/main\/assets\//);
   assert.match(ignored, /android\/capacitor-cordova-android-plugins\//);
 });
