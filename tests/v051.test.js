@@ -34,6 +34,7 @@ test('API 36 release QC uses a disposable signer and exercises the release varia
   assert.match(workflow, /bundleRelease/);
   assert.match(workflow, /scorerTestBuildType=release connectedReleaseAndroidTest/);
   assert.match(workflow, /ci-only-not-for-play/);
+  assert.match(workflow, /GITHUB_ENV/);
   assert.match(workflow, /jarsigner -verify/);
   assert.match(workflow, /sha256sum/);
   assert.doesNotMatch(workflow, /secrets\.SCORER_UPLOAD/);
@@ -50,6 +51,7 @@ test('Play AAB workflow is manual, secret-gated, verified and non-publishing', a
   assert.match(workflow, /secrets\.SCORER_UPLOAD_KEY_ALIAS/);
   assert.match(workflow, /secrets\.SCORER_UPLOAD_KEY_PASSWORD/);
   assert.match(workflow, /base64 --decode/);
+  assert.match(workflow, /GITHUB_ENV/);
   assert.match(workflow, /npm run check/);
   assert.match(workflow, /bundleRelease/);
   assert.match(workflow, /jarsigner -verify/);
