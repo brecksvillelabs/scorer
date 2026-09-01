@@ -4,6 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem('scorer-theme-v1');
+        const preference = ['system','light','dark'].includes(saved) ? saved : 'dark';
+        const resolved = preference === 'system'
+          ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : preference;
+        document.documentElement.dataset.themePreference = preference;
+        document.documentElement.dataset.theme = resolved;
+      } catch {
+        document.documentElement.dataset.themePreference = 'dark';
+        document.documentElement.dataset.theme = 'dark';
+      }
+    })();
+  </script>
   <title>Scorer</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./assets/app-icon.svg" type="image/svg+xml">
@@ -14,12 +30,13 @@
   <link rel="stylesheet" href="./v038.css">
   <link rel="stylesheet" href="./v039.css">
   <link rel="stylesheet" href="./v040.css">
+  <link rel="stylesheet" href="./theme.css">
 </head>
 <body>
   <div class="app-shell" id="appShell">
     <header class="topbar">
       <div class="brand-lockup">
-        <div class="brand-mark">S</div>
+        <div class="brand-mark"><img class="brand-icon" src="./assets/app-icon.svg" alt=""></div>
         <div><div class="eyebrow">BRECKSVILLE LABS</div><h1>Scorer</h1></div>
       </div>
       <div class="top-actions">
@@ -28,6 +45,20 @@
         <button id="editBtn" class="icon-btn" type="button" aria-label="Game setup">⚙</button>
         <button id="quickCameraBtn" class="icon-btn quick-camera-btn" type="button" aria-label="Take game photo">📷</button>
         <button id="journalBtn" class="icon-btn" type="button" aria-label="Open Game Diary">📖</button>
+        <details id="appearanceMenu" class="appearance-menu">
+          <summary class="icon-btn" aria-label="Appearance: Dark appearance" title="Appearance: Dark appearance">
+            <span class="appearance-glyph" aria-hidden="true">☾</span>
+          </summary>
+          <div class="appearance-panel" role="dialog" aria-label="Choose appearance">
+            <div class="appearance-panel-head"><strong>Appearance</strong><span>Choose how Scorer looks on this device.</span></div>
+            <div class="appearance-options" role="group" aria-label="Theme preference">
+              <button class="appearance-option" type="button" data-theme-choice="system" aria-pressed="false"><span aria-hidden="true">◐</span><b>System</b><small>Match device</small></button>
+              <button class="appearance-option" type="button" data-theme-choice="light" aria-pressed="false"><span aria-hidden="true">☀</span><b>Light</b><small>Bright court</small></button>
+              <button class="appearance-option" type="button" data-theme-choice="dark" aria-pressed="true"><span aria-hidden="true">☾</span><b>Dark</b><small>Night game</small></button>
+            </div>
+            <div id="appearanceCurrent" class="appearance-current" aria-live="polite">Dark appearance</div>
+          </div>
+        </details>
         <button id="displayBtn" class="display-btn" type="button">Display</button>
       </div>
     </header>
@@ -141,6 +172,7 @@
     </section>
   </div>
 
+  <script type="module" src="./theme.js"></script>
   <script type="module" src="./app.js"></script>
   <script type="module" src="./enhancements.js"></script>
   <script type="module" src="./v031.js"></script>
