@@ -28,7 +28,7 @@ test('release signing is environment-only and rejects incomplete configuration',
 });
 
 test('API 36 release QC uses a disposable signer and exercises the release variant', async () => {
-  const workflow = await read('.github/workflows/android-release.yml');
+  const workflow = await read('.github/workflows/android.yml');
 
   assert.match(workflow, /api-level: 36/);
   assert.match(workflow, /bundleRelease/);
