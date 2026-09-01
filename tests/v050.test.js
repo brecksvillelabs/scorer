@@ -26,10 +26,12 @@ test('current release numbering and Android 16 target are aligned', async () => 
   const gradle = await read('android/app/build.gradle');
   const variables = await read('android/variables.gradle');
 
-  assert.equal(version, '0.5.1');
+  assert.match(version, /^\d+\.\d+\.\d+$/);
   assert.equal(pkg.version, version);
-  assert.match(gradle, /versionCode 501/);
-  assert.match(gradle, /versionName "0\.5\.1"/);
+  const [major, minor, patch] = version.split('.').map(Number);
+  const versionCode = major * 10000 + minor * 100 + patch;
+  assert.match(gradle, new RegExp(`versionCode ${versionCode}`));
+  assert.match(gradle, new RegExp(`versionName "${version.replaceAll('.', '\\.')}"`));
   assert.match(variables, /compileSdkVersion = 36/);
   assert.match(variables, /targetSdkVersion = 36/);
 });
@@ -42,7 +44,7 @@ test('release preparation uses locked Node installs and ignores generated native
 
   assert.match(ci, /npm ci --no-audit --no-fund/);
   assert.match(android, /npm ci --no-audit --no-fund/);
-  assert.equal(lock.packages[''].version, '0.5.1');
+  assert.equal(lock.packages[''].version, JSON.parse(await read('package.json')).version);
   assert.match(ignored, /android\/app\/src\/main\/assets\//);
   assert.match(ignored, /android\/capacitor-cordova-android-plugins\//);
 });
