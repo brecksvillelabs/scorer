@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      SCORER_UPLOAD_KEYSTORE_PATH: ${{ runner.temp }}/scorer-upload.jks
       SCORER_UPLOAD_KEYSTORE_BASE64: ${{ secrets.SCORER_UPLOAD_KEYSTORE_BASE64 }}
       SCORER_UPLOAD_STORE_PASSWORD: ${{ secrets.SCORER_UPLOAD_STORE_PASSWORD }}
       SCORER_UPLOAD_KEY_ALIAS: ${{ secrets.SCORER_UPLOAD_KEY_ALIAS }}
@@ -40,8 +39,10 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          printf '%s' "$SCORER_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$SCORER_UPLOAD_KEYSTORE_PATH"
-          test -s "$SCORER_UPLOAD_KEYSTORE_PATH"
+          keystore_path="$RUNNER_TEMP/scorer-upload.jks"
+          echo "SCORER_UPLOAD_KEYSTORE_PATH=$keystore_path" >> "$GITHUB_ENV"
+          printf '%s' "$SCORER_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          test -s "$keystore_path"
 
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
