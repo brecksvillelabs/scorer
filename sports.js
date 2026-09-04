@@ -119,7 +119,8 @@ export function createInitialState(options = {}) {
     },
     volleyball: {
       bestOf: Number(options.bestOf || 5), setTo: Number(options.setTo || 25), decidingSetTo: Number(options.decidingSetTo || 15),
-      winBy: Number(options.winBy || 2), servingTeam: 'A', setHistory: [], timeouts: { A: 2, B: 2 }, matchWinner: null
+      winBy: Number(options.winBy || 2), servingTeam: options.servingTeam === 'B' ? 'B' : 'A',
+      firstServer: options.servingTeam === 'B' ? 'B' : 'A', phase: 'live', setHistory: [], timeouts: { A: 2, B: 2 }, matchWinner: null
     },
     basketball: { possession: 'A', timeouts: { A: 5, B: 5 } },
     soccer: { stoppage: 0 },
@@ -127,14 +128,15 @@ export function createInitialState(options = {}) {
     tennis: {
       bestOf: Number(options.tennisBestOf || 3), points: { A: 0, B: 0 }, games: { A: 0, B: 0 }, sets: { A: 0, B: 0 },
       servingTeam: options.servingTeam || 'A', tiebreak: false, tiebreakPoints: { A: 0, B: 0 }, tiebreakStartServer: null,
-      setHistory: [], matchWinner: null
+      setHistory: [], phase: 'live', matchWinner: null
     },
     badminton: {
       bestOf: Number(options.badmintonBestOf || 3), gameTo: Number(options.badmintonGameTo || 21), points: { A: 0, B: 0 }, games: { A: 0, B: 0 },
-      servingTeam: options.servingTeam || 'A', gameHistory: [], matchWinner: null
+      servingTeam: options.servingTeam || 'A', gameHistory: [], phase: 'live', matchWinner: null
     },
     cricket: {
       format: options.cricketFormat || 'T20', oversLimit: Number(options.oversLimit || 20), battingTeam: battingFirst, innings: 1,
+      firstBattingTeam: battingFirst,
       inningsComplete: false, matchWinner: null, target: null, needsBowler: false,
       extras: { A: { wides: 0, noBalls: 0 }, B: { wides: 0, noBalls: 0 } },
       striker: battingRoster[0] || 'Batter 1',
@@ -204,6 +206,7 @@ export function normalizeSportFoundationState(state) {
 
   if (next.cricket) {
     const c = next.cricket;
+    c.firstBattingTeam ||= c.innings === 1 ? c.battingTeam : otherSide(c.battingTeam);
     c.dismissals ||= { A: [], B: [] };
     c.dismissals.A ||= [];
     c.dismissals.B ||= [];
@@ -223,18 +226,30 @@ export function normalizeSportFoundationState(state) {
     ensureBattingStat(next, batSide, c.striker);
     ensureBattingStat(next, batSide, c.nonStriker);
   }
+  if (next.volleyball) {
+    next.volleyball.firstServer ||= next.volleyball.servingTeam || 'A';
+    next.volleyball.phase ||= next.finished ? 'final' : 'live';
+  }
+  if (next.tennis) next.tennis.phase ||= next.finished ? 'final' : 'live';
+  if (next.badminton) next.badminton.phase ||= next.finished ? 'final' : 'live';
   return next;
 }
 
 export function applySimpleScore(state, side, delta) {
   const next = clone(state); const key = teamKey(side);
   next[key].score = Math.max(0, Number(next[key].score || 0) + Number(delta || 0));
-  appendCoreEvent(next, 'score.adjusted', { side, delta: Number(delta || 0), score: next[key].score });
+  appendCoreEvent(next, 'score.adjusted', {
+    side, delta: Number(delta || 0), score: next[key].score,
+    scoreA: next.teamA.score, scoreB: next.teamB.score,
+    clockSeconds: next.clock?.seconds
+  });
   next.updatedAt = Date.now(); return next;
 }
 
 export function volleyballPoint(state, side, delta = 1) {
-  const next = clone(state); const key = teamKey(side); const other = teamKey(otherSide(side));
+  const next = clone(state); if (next.finished) return next;
+  const key = teamKey(side); const other = teamKey(otherSide(side));
+  if (next.volleyball.phase === 'set_break') next.volleyball.phase = 'live';
   next[key].score = Math.max(0, next[key].score + delta);
   if (delta > 0) next.volleyball.servingTeam = side;
   appendCoreEvent(next, 'volleyball.point', { side, delta, scoreA: next.teamA.score, scoreB: next.teamB.score });
@@ -245,8 +260,19 @@ export function volleyballPoint(state, side, delta = 1) {
     next.volleyball.setHistory.push({ set: next.period, scoreA: next.teamA.score, scoreB: next.teamB.score, winner: side });
     appendCoreEvent(next, 'volleyball.set_won', { side, set: next.period, scoreA: next.teamA.score, scoreB: next.teamB.score });
     const needed = Math.ceil(next.volleyball.bestOf / 2);
-    if (next[key].sets >= needed) finish(next, side, 'volleyball');
-    else { next.period += 1; next.teamA.score = 0; next.teamB.score = 0; next.volleyball.timeouts = { A: 2, B: 2 }; }
+    if (next[key].sets >= needed) {
+      next.volleyball.phase = 'final';
+      finish(next, side, 'volleyball');
+    } else {
+      next.period += 1; next.teamA.score = 0; next.teamB.score = 0;
+      next.volleyball.phase = 'set_break';
+      next.volleyball.timeouts = { A: 2, B: 2 };
+      // Alternate the first serve for familiar local scoring. The scorer may
+      // still override the server before the next rally, including a decider.
+      next.volleyball.servingTeam = next.period % 2 === 1
+        ? next.volleyball.firstServer
+        : otherSide(next.volleyball.firstServer);
+    }
   }
   next.updatedAt = Date.now(); return next;
 }
@@ -254,6 +280,7 @@ export function volleyballPoint(state, side, delta = 1) {
 export function tennisPoint(state, side) {
   const next = clone(state); if (next.finished) return next;
   const t = next.tennis; const other = otherSide(side);
+  if (t.phase === 'set_break') t.phase = 'live';
   if (t.tiebreak) {
     t.tiebreakPoints[side] += 1;
     appendCoreEvent(next, 'tennis.point', { side, tiebreak: true, pointA: t.tiebreakPoints.A, pointB: t.tiebreakPoints.B });
@@ -288,10 +315,11 @@ function winTennisSet(next, side, result) {
   t.sets[side] += 1; t.setHistory.push({ set: t.setHistory.length + 1, winner: side, ...result });
   appendCoreEvent(next, 'tennis.set_won', { side, ...result });
   const needed = Math.ceil(t.bestOf / 2);
-  if (t.sets[side] >= needed) { t.matchWinner = side; finish(next, side, 'tennis'); return; }
+  if (t.sets[side] >= needed) { t.phase = 'final'; t.matchWinner = side; finish(next, side, 'tennis'); return; }
   if (t.tiebreak && t.tiebreakStartServer) t.servingTeam = otherSide(t.tiebreakStartServer);
   t.points = { A: 0, B: 0 }; t.games = { A: 0, B: 0 }; t.tiebreak = false; t.tiebreakPoints = { A: 0, B: 0 }; t.tiebreakStartServer = null;
   next.period += 1;
+  t.phase = 'set_break';
 }
 
 function tiebreakServerForNextPoint(start, totalPlayed) {
@@ -315,6 +343,7 @@ export function formatTennisPoint(state, side) {
 export function badmintonPoint(state, side) {
   const next = clone(state); if (next.finished) return next;
   const b = next.badminton; const other = otherSide(side);
+  if (b.phase === 'game_break') b.phase = 'live';
   b.points[side] += 1; b.servingTeam = side;
   appendCoreEvent(next, 'badminton.rally', { side, pointA: b.points.A, pointB: b.points.B });
   const p = b.points[side], op = b.points[other];
@@ -323,8 +352,8 @@ export function badmintonPoint(state, side) {
     b.games[side] += 1; b.gameHistory.push({ game: b.gameHistory.length + 1, winner: side, scoreA: b.points.A, scoreB: b.points.B });
     appendCoreEvent(next, 'badminton.game_won', { side, game: b.gameHistory.length, scoreA: b.points.A, scoreB: b.points.B });
     const needed = Math.ceil(b.bestOf / 2);
-    if (b.games[side] >= needed) { b.matchWinner = side; finish(next, side, 'badminton'); }
-    else { b.points = { A: 0, B: 0 }; next.period += 1; }
+    if (b.games[side] >= needed) { b.phase = 'final'; b.matchWinner = side; finish(next, side, 'badminton'); }
+    else { b.points = { A: 0, B: 0 }; b.phase = 'game_break'; next.period += 1; }
   }
   next.updatedAt = Date.now(); return next;
 }
@@ -441,14 +470,20 @@ export function advancePeriod(state, delta = 1) {
   if (['volleyball', 'tennis', 'badminton'].includes(next.sport)) return next;
   if (next.sport === 'cricket') return delta > 0 ? switchCricketInnings(next) : next;
   const max = next.maxPeriods || 99, before = next.period;
-  next.period = Math.min(max, Math.max(1, next.period + delta));
+  const overtimeSport = ['basketball','football','lacrosse'].includes(next.sport);
+  const tiedForOvertime = numScore(next.teamA.score) === numScore(next.teamB.score);
+  const overtimeCeiling = overtimeSport && delta > 0 && before >= max && tiedForOvertime ? before + 1 : Math.max(max,before);
+  next.period = Math.min(overtimeCeiling, Math.max(1, next.period + delta));
   if (next.sport === 'basketball' && delta > 0 && next.period !== before) { next.teamA.fouls = 0; next.teamB.fouls = 0; }
+  if (next.sport === 'football' && before === 2 && next.period === 3) next.football.timeouts = { A: 3, B: 3 };
   if (next.clock.mode === 'down') next.clock.seconds = next.clock.periodSeconds;
   if (next.clock.mode === 'up') next.clock.seconds = 0;
   next.clock.running = false;
   if (next.period !== before) appendCoreEvent(next, 'period.changed', { from: before, to: next.period });
   next.updatedAt = Date.now(); return next;
 }
+
+function numScore(value) { return Number(value || 0); }
 
 export function tickClock(state) {
   const next = clone(state); if (!next.clock.running) return next;
@@ -468,6 +503,7 @@ export function swapSides(state) {
   if (next.badminton) { next.badminton.servingTeam = flip(next.badminton.servingTeam); next.badminton.matchWinner = flip(next.badminton.matchWinner); [next.badminton.points.A,next.badminton.points.B]=[next.badminton.points.B,next.badminton.points.A]; [next.badminton.games.A,next.badminton.games.B]=[next.badminton.games.B,next.badminton.games.A]; }
   if (next.cricket) {
     next.cricket.battingTeam = flip(next.cricket.battingTeam); next.cricket.matchWinner = flip(next.cricket.matchWinner);
+    next.cricket.firstBattingTeam = flip(next.cricket.firstBattingTeam);
     [next.cricket.extras.A,next.cricket.extras.B]=[next.cricket.extras.B,next.cricket.extras.A];
     [next.cricket.battingStats.A,next.cricket.battingStats.B]=[next.cricket.battingStats.B,next.cricket.battingStats.A];
     [next.cricket.bowlingStats.A,next.cricket.bowlingStats.B]=[next.cricket.bowlingStats.B,next.cricket.bowlingStats.A];

@@ -36,6 +36,17 @@ Scorer is a mobile-first, installable multi-sport scoreboard from Brecksville La
 
 Competition formats vary by league and age group, so Scorer keeps core scoring behavior correct while leaving common period/set/overs settings configurable.
 
+## v0.5.2 — scorecards, sharing and appearance
+
+- A new Scorer launcher mark with dark, light and Android monochrome variants.
+- User-selectable light, dark and system appearance profiles.
+- Familiar sport-specific live boards and full summaries across all ten sports.
+- One-tap WhatsApp, Messages and Android sharing with score, phase and game context.
+- Expanded cricket innings cards with every tracked batter, dismissals, fall of wickets and bowling figures.
+- Rules and lifecycle corrections for breaks, overtime, lacrosse restarts, Kabaddi raids and baseball walk-offs.
+
+The full implementation scope and the official rules references used for this release are documented in `docs/SPORT_SCORECARDS_V052.md`.
+
 ## Run locally
 
 ```bash

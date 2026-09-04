@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="./v039.css">
   <link rel="stylesheet" href="./v040.css">
   <link rel="stylesheet" href="./theme.css">
+  <link rel="stylesheet" href="./scoreboards.css">
 </head>
 <body>
   <div class="app-shell" id="appShell">
@@ -72,6 +73,11 @@
       <div class="save-chip" id="saveStatus">Saved</div>
     </section>
 
+    <nav class="fan-score-actions" aria-label="Scorecard and sharing">
+      <button id="fullScoreboardBtn" class="fan-score-btn" type="button"><span aria-hidden="true">▤</span> Full scoreboard</button>
+      <button id="shareScoreBtn" class="fan-score-btn primary" type="button"><span aria-hidden="true">↗</span> Share score</button>
+    </nav>
+
     <main id="gameSurface" class="game-surface"></main>
     <section id="sportTools" class="sport-tools"></section>
   </div>
@@ -79,6 +85,20 @@
   <button class="exit-display hidden" id="exitDisplayBtn" type="button">Exit display</button>
   <input id="quickPhotoInput" class="quick-photo-input" type="file" accept="image/*" capture="environment" aria-hidden="true" tabindex="-1">
   <div class="toast" id="toast" role="status"></div>
+
+  <div class="scoreboard-overlay hidden" id="fullScoreboardModal" aria-hidden="true">
+    <section class="full-scoreboard-sheet" role="dialog" aria-modal="true" aria-labelledby="fullScoreboardTitle">
+      <header class="full-scoreboard-head">
+        <div><div class="eyebrow">MATCH CENTRE</div><h2 id="fullScoreboardTitle">Full scoreboard</h2></div>
+        <button id="closeFullScoreboardBtn" class="icon-btn" type="button" aria-label="Close full scoreboard">✕</button>
+      </header>
+      <div id="fullScoreboardContent" class="full-scoreboard-content"></div>
+      <footer class="full-scoreboard-actions">
+        <button id="copyScoreBtn" class="secondary-btn" type="button">Copy update</button>
+        <button id="shareScoreSheetBtn" class="primary-btn" type="button">Share score</button>
+      </footer>
+    </section>
+  </div>
 
   <div class="modal-backdrop" id="setupModal" aria-hidden="true">
     <div class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setupTitle">

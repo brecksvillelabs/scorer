@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "test": "node --test",
-    "check": "node --check app.js && node --check sports.js && node --check journal.js && node --check diary.js && node --check enhancements.js && node --check v031-core.js && node --check v031.js && node --check v032-core.js && node --check v032.js && node --check v033.js && node --check v034-core.js && node --check v034.js && node --check v034-guard.js && node --check v035-core.js && node --check v036-core.js && node --check v037-core.js && node --check v038-core.js && node --check v039-core.js && node --check v039.js && node --check v040-core.js && node --check native-bridge.js && node --check v040.js && node --check baseball-core.js && node --check baseball-ui.js && node --test",
+    "check": "node --check app.js && node --check sports.js && node --check scoreboards.js && node --check journal.js && node --check diary.js && node --check enhancements.js && node --check v031-core.js && node --check v031.js && node --check v032-core.js && node --check v032.js && node --check v033.js && node --check v034-core.js && node --check v034.js && node --check v034-guard.js && node --check v035-core.js && node --check v036-core.js && node --check v037-core.js && node --check v038-core.js && node --check v039-core.js && node --check v039.js && node --check v040-core.js && node --check native-bridge.js && node --check v040.js && node --check baseball-core.js && node --check baseball-ui.js && node --test",
     "native:prepare": "node scripts/prepare-native.mjs",
     "native:sync": "npm run native:prepare && npx cap sync android",
     "native:open": "npm run native:sync && npx cap open android",

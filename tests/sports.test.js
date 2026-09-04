@@ -20,6 +20,17 @@ test('volleyball wins set at 25 by two', () => {
   assert.equal(s.teamA.sets, 1);
   assert.equal(s.period, 2);
   assert.equal(s.teamA.score, 0);
+  assert.equal(s.volleyball.phase, 'set_break');
+  assert.equal(s.volleyball.servingTeam, 'B');
+});
+
+test('first rally after a volleyball set break starts the next set', () => {
+  let s = createInitialState({ sport: 'volleyball', bestOf: 3 });
+  s.teamA.score = 24;
+  s = volleyballPoint(s, 'A');
+  s = volleyballPoint(s, 'B');
+  assert.equal(s.volleyball.phase, 'live');
+  assert.equal(s.teamB.score, 1);
 });
 
 test('volleyball does not end at 25-24', () => {
@@ -65,6 +76,7 @@ test('badminton wins game at 21 with two point margin', () => {
   s = badmintonPoint(s, 'A');
   assert.equal(s.badminton.games.A, 1);
   assert.equal(s.period, 2);
+  assert.equal(s.badminton.phase, 'game_break');
 });
 
 test('badminton continues at 21-20', () => {
@@ -136,6 +148,23 @@ test('basketball fouls reset at new quarter', () => {
   assert.equal(s.period, 2);
   assert.equal(s.teamA.fouls, 0);
   assert.equal(s.teamB.fouls, 0);
+});
+
+test('football timeouts reset at halftime only', () => {
+  let s = createInitialState({ sport: 'football' });
+  s.period = 2;
+  s.football.timeouts = { A: 1, B: 0 };
+  s = advancePeriod(s, 1);
+  assert.equal(s.period, 3);
+  assert.deepEqual(s.football.timeouts, { A: 3, B: 3 });
+});
+
+test('tied clock sports can advance into overtime', () => {
+  let s = createInitialState({ sport:'basketball' });
+  s.period = 4;
+  s.teamA.score = 70; s.teamB.score = 70;
+  s = advancePeriod(s,1);
+  assert.equal(s.period,5);
 });
 
 test('swap sides flips possession', () => {

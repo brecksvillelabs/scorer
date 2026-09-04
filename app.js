@@ -1,7 +1,7 @@
 import {
   SPORT_DEFS, createInitialState, clone, applySimpleScore, volleyballPoint, tennisPoint, formatTennisPoint,
   badmintonPoint, cricketAction, setCricketRole, switchCricketInnings, advancePeriod, tickClock, swapSides,
-  formatClock, formatOvers, strikeRate, economy, getPeriodText, teamKey, otherSide
+  formatClock, formatOvers, strikeRate, economy, getPeriodText, teamKey, otherSide, normalizeSportFoundationState
 } from './sports.js';
 import {
   EXTRA_SPORT_DEFS, createScorerState, lacrosseGoal, setLacrossePossession, lacrosseTimeout,
@@ -11,10 +11,12 @@ import {
 import {
   BASEBALL_SPORT_DEF, createBaseballState, getBaseballPeriodText, baseballRun, baseballHit,
   baseballError, baseballPitch, baseballPlateAppearance, toggleBase, clearBaseballBases,
-  advanceBaseballHalf, swapBaseballSides
+  advanceBaseballHalf, swapBaseballSides, baseballHomeRun
 } from './baseball-core.js';
 import { baseballSetupMarkup, baseballBoardMarkup, baseballToolsMarkup } from './baseball-ui.js';
 import { changeTimeout, timeoutStatus } from './v037-core.js';
+import { formatShareMessage, fullScoreboardMarkup, scoreboardHeading, scoreShareTitle } from './scoreboards.js';
+import { shareContent } from './native-bridge.js';
 
 const SPORTS = { ...SPORT_DEFS, ...EXTRA_SPORT_DEFS, baseball: BASEBALL_SPORT_DEF };
 const STORAGE_KEY = 'scorer-state-v2';
@@ -30,6 +32,9 @@ let toastTimer = null;
 const el = {
   appShell: $('appShell'), sportPill: $('sportPill'), periodText: $('periodText'), clockBtn: $('clockBtn'), saveStatus: $('saveStatus'),
   gameSurface: $('gameSurface'), sportTools: $('sportTools'), undoBtn: $('undoBtn'), swapBtn: $('swapBtn'), editBtn: $('editBtn'), displayBtn: $('displayBtn'), exitDisplayBtn: $('exitDisplayBtn'),
+  fullScoreboardBtn: $('fullScoreboardBtn'), shareScoreBtn: $('shareScoreBtn'), fullScoreboardModal: $('fullScoreboardModal'),
+  fullScoreboardTitle: $('fullScoreboardTitle'), fullScoreboardContent: $('fullScoreboardContent'), closeFullScoreboardBtn: $('closeFullScoreboardBtn'),
+  copyScoreBtn: $('copyScoreBtn'), shareScoreSheetBtn: $('shareScoreSheetBtn'),
   setupModal: $('setupModal'), closeSetupBtn: $('closeSetupBtn'), sportGrid: $('sportGrid'), sportSettings: $('sportSettings'),
   inputNameA: $('inputNameA'), inputNameB: $('inputNameB'), inputColorA: $('inputColorA'), inputColorB: $('inputColorB'),
   inputLogoA: $('inputLogoA'), inputLogoB: $('inputLogoB'), logoPreviewA: $('logoPreviewA'), logoPreviewB: $('logoPreviewB'),
@@ -47,7 +52,7 @@ function boot() {
   buildSportChoices(); bindEvents();
   const saved = loadState();
   if (saved && saved.version === 2 && SPORTS[saved.sport]) {
-    state = saved; selectedSport = state.sport; pendingLogos = { A: state.teamA.logo || '', B: state.teamB.logo || '' }; closeSetup();
+    state = normalizeSportFoundationState(saved); selectedSport = state.sport; pendingLogos = { A: state.teamA.logo || '', B: state.teamB.logo || '' }; closeSetup();
   } else {
     state = createStateFor({ sport: selectedSport }); renderSportSettings(); openSetup(false);
   }
@@ -59,6 +64,12 @@ function bindEvents() {
   el.undoBtn.addEventListener('click', undo);
   el.swapBtn.addEventListener('click', () => pushCommit(swapAllSides(state), 'Sides swapped'));
   el.editBtn.addEventListener('click', () => { hydrateSetup(); openSetup(true); });
+  el.fullScoreboardBtn.addEventListener('click', openFullScoreboard);
+  el.shareScoreBtn.addEventListener('click', shareCurrentScore);
+  el.shareScoreSheetBtn.addEventListener('click', shareCurrentScore);
+  el.copyScoreBtn.addEventListener('click', copyScoreUpdate);
+  el.closeFullScoreboardBtn.addEventListener('click', closeFullScoreboard);
+  el.fullScoreboardModal.addEventListener('click', event => { if (event.target === el.fullScoreboardModal) closeFullScoreboard(); });
   el.displayBtn.addEventListener('click', toggleDisplay); el.exitDisplayBtn.addEventListener('click', toggleDisplay);
   el.clockBtn.addEventListener('click', toggleClock); el.closeSetupBtn.addEventListener('click', closeSetup);
   el.startGameBtn.addEventListener('click', startFromSetup); el.resetSavedBtn.addEventListener('click', newMatch);
@@ -72,6 +83,7 @@ function bindEvents() {
     if (e.target?.matches('input,select,textarea')) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
     if (e.code === 'Space' && SPORTS[state?.sport]?.hasClock) { e.preventDefault(); toggleClock(); }
+    if (e.key === 'Escape' && !el.fullScoreboardModal.classList.contains('hidden')) { closeFullScoreboard(); return; }
     if (e.key.toLowerCase() === 'f') toggleDisplay();
   });
 }
@@ -201,6 +213,39 @@ function render() {
   el.sportPill.textContent=`${def.icon} ${def.name}`; el.periodText.textContent=periodTextFor(state); el.clockBtn.classList.toggle('hidden',!def.hasClock); el.clockBtn.textContent=formatClock(state.clock.seconds);
   if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else if (state.sport==='lacrosse') renderLacrosse(); else if (state.sport==='kabaddi') renderKabaddi(); else if (state.sport==='baseball') renderBaseball(); else renderTeamSport();
   renderTools(); el.undoBtn.disabled=history.length===0; el.saveStatus.textContent='Saved';
+  if (!el.fullScoreboardModal.classList.contains('hidden')) renderFullScoreboard();
+}
+
+function renderFullScoreboard(){
+  el.fullScoreboardTitle.textContent=scoreboardHeading(state);
+  el.fullScoreboardContent.innerHTML=fullScoreboardMarkup(state);
+}
+function openFullScoreboard(){
+  renderFullScoreboard();
+  el.fullScoreboardModal.classList.remove('hidden');
+  el.fullScoreboardModal.setAttribute('aria-hidden','false');
+  el.closeFullScoreboardBtn.focus();
+}
+function closeFullScoreboard(){
+  el.fullScoreboardModal.classList.add('hidden');
+  el.fullScoreboardModal.setAttribute('aria-hidden','true');
+  el.fullScoreboardBtn.focus();
+}
+async function copyText(text){
+  if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; }
+  const area=document.createElement('textarea'); area.value=text; area.setAttribute('readonly',''); area.style.position='fixed'; area.style.opacity='0';
+  document.body.appendChild(area); area.select(); const copied=document.execCommand?.('copy'); area.remove(); return Boolean(copied);
+}
+async function copyScoreUpdate(){
+  try { await copyText(formatShareMessage(state)); toast('Score update copied'); }
+  catch { toast('Could not copy the score update'); }
+}
+async function shareCurrentScore(){
+  const text=formatShareMessage(state);
+  try {
+    const result=await shareContent({title:scoreShareTitle(state),text,dialogTitle:'Share score update'});
+    if (!result.shared) { await copyText(text); toast('Score update copied — paste it into a message'); }
+  } catch(error) { if(error?.name!=='AbortError') toast('Could not share the score update'); }
 }
 
 function renderTeamSport() {
@@ -247,7 +292,7 @@ function renderLacrosse(){
   const l=state.lacrosse; const shotOn=l.shotClockSeconds>0;
   el.gameSurface.innerHTML=`<section class="v035-lax-board">
     <div class="v035-sport-hero"><div><div class="eyebrow">${l.discipline==='sixes'?'LACROSSE SIXES':'FIELD LACROSSE'}</div><strong>${periodTextFor(state)}</strong></div><div class="v035-clock-stack"><span>Game ${formatClock(state.clock.seconds)}</span>${shotOn?`<b class="${l.shotClock<=10?'urgent':''}">Shot ${l.shotClock}</b>`:''}</div></div>
-    <div class="v035-lax-teams">${['A','B'].map(side=>{const t=state[teamKey(side)];return `<article class="v035-lax-team" style="--team-color:${safeColor(t.color)}"><div class="team-head"><div class="team-logo">${logoMarkup(side)}</div><div><div class="team-name">${esc(t.name)}</div><div class="team-sub">${l.possession===side?'● Possession':'Defense'} · ${l.timeouts[side]} TO</div></div></div><div class="v035-lax-score">${t.score}</div><div class="v035-score-row"><button class="score-btn primary" data-action="lacrosse-goal" data-side="${side}" data-delta="1">Goal +1</button><button class="score-btn" data-action="lacrosse-goal" data-side="${side}" data-delta="-1">−1</button></div></article>`;}).join('')}</div>
+    <div class="v035-lax-teams">${['A','B'].map(side=>{const t=state[teamKey(side)];const role=l.possession===side?'● Possession':l.possession?'Defense':'Restart pending';return `<article class="v035-lax-team" style="--team-color:${safeColor(t.color)}"><div class="team-head"><div class="team-logo">${logoMarkup(side)}</div><div><div class="team-name">${esc(t.name)}</div><div class="team-sub">${role} · ${l.timeouts[side]} TO</div></div></div><div class="v035-lax-score">${t.score}</div><div class="v035-score-row"><button class="score-btn primary" data-action="lacrosse-goal" data-side="${side}" data-delta="1">Goal +1</button><button class="score-btn" data-action="lacrosse-goal" data-side="${side}" data-delta="-1">−1</button></div></article>`;}).join('')}</div>
   </section>`;
 }
 
@@ -255,8 +300,8 @@ function renderKabaddi(){
   const k=state.kabaddi, raid=k.raidingTeam, defense=otherSide(raid), raidTeam=state[teamKey(raid)], defenseTeam=state[teamKey(defense)];
   el.gameSurface.innerHTML=`<section class="v035-kabaddi-board">
     <div class="v035-kabaddi-head"><div><div class="eyebrow">KABADDI · ${periodTextFor(state).toUpperCase()}</div><strong>${formatClock(state.clock.seconds)}</strong></div><div class="v035-raid-clock ${k.raidClock<=10?'urgent':''}"><span>RAID</span><b>${k.raidClock}</b></div></div>
-    <div class="v035-kabaddi-teams">${['A','B'].map(side=>{const t=state[teamKey(side)];return `<article class="v035-kabaddi-team ${raid===side?'raiding':''}" style="--team-color:${safeColor(t.color)}"><div class="team-head"><div class="team-logo">${logoMarkup(side)}</div><div><div class="team-name">${esc(t.name)}</div><div class="team-sub">${raid===side?'RAIDING':'DEFENDING'} · ${k.timeouts[side]} TO</div></div></div><div class="v035-kabaddi-score">${t.score}</div><div class="v035-score-row"><button class="mini-btn" data-action="kabaddi-technical" data-side="${side}-allOut">All Out +2</button><button class="mini-btn" data-action="kabaddi-correct" data-side="${side}">Score −1</button></div></article>`;}).join('')}</div>
-    <div class="v035-raid-panel"><div class="v035-raid-title"><span>${esc(raidTeam.name)} raid</span><strong>Current raid +${k.raidPoints}</strong></div><div class="v035-raid-actions"><button class="score-btn primary" data-action="kabaddi" data-value="touch">Touch +1</button><button class="score-btn" data-action="kabaddi" data-value="bonus">Bonus +1</button><button class="score-btn danger" data-action="kabaddi" data-value="tackle">${esc(defenseTeam.name)} tackle +1 & end</button><button class="score-btn" data-action="kabaddi" data-value="empty">Empty raid</button><button class="score-btn primary" data-action="kabaddi" data-value="end">End raid →</button></div></div>
+    <div class="v035-kabaddi-teams">${['A','B'].map(side=>{const t=state[teamKey(side)];return `<article class="v035-kabaddi-team ${raid===side?'raiding':''}" style="--team-color:${safeColor(t.color)}"><div class="team-head"><div class="team-logo">${logoMarkup(side)}</div><div><div class="team-name">${esc(t.name)}</div><div class="team-sub">${raid===side?'RAIDING':'DEFENDING'} · ${k.timeouts[side]} TO</div></div></div><div class="v035-kabaddi-score">${t.score}</div><div class="v035-score-row"><button class="mini-btn" data-action="kabaddi-technical" data-side="${side}-allOut">Award All Out +2</button><button class="mini-btn" data-action="kabaddi-correct" data-side="${side}">Score −1</button></div></article>`;}).join('')}</div>
+    <div class="v035-raid-panel"><div class="v035-raid-title"><span>${esc(raidTeam.name)} raid${(k.emptyRaidStreak?.[raid]||0)>=2?' · DO-OR-DIE':''}</span><strong>Pending raid +${k.raidPoints}</strong></div><div class="v035-raid-actions"><button class="score-btn primary" data-action="kabaddi" data-value="touch">Touch +1 pending</button><button class="score-btn" data-action="kabaddi" data-value="bonus">Award bonus +1 pending</button><button class="score-btn danger" data-action="kabaddi" data-value="tackle">${esc(defenseTeam.name)} tackle +1 & end</button><button class="score-btn danger" data-action="kabaddi" data-value="superTackle">Award super tackle +2</button><button class="score-btn" data-action="kabaddi" data-value="empty">Empty raid</button><button class="score-btn primary" data-action="kabaddi" data-value="end">Raider returns · commit →</button></div></div>
   </section>`;
 }
 
@@ -353,6 +398,7 @@ function handleActionClick(e){
   else if(action==='kabaddi-set-raid') n=setKabaddiRaid(state,side);
   else if(action==='kabaddi-raid-clock') n=kabaddiRaidClockAction(state,b.dataset.value);
   else if(action==='baseball-run') n=baseballRun(state,delta);
+  else if(action==='baseball-home-run') n=baseballHomeRun(state);
   else if(action==='baseball-hit') n=baseballHit(state,delta);
   else if(action==='baseball-error') n=baseballError(state,delta);
   else if(action==='baseball-pitch') n=baseballPitch(state,b.dataset.value);

@@ -1,32 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">Scorer</title>
-  <desc id="desc">An abstract S formed by two opposing scoreboard ribbons.</desc>
+  <desc id="desc">A sharp abstract S formed by two interlocking score panels.</desc>
   <defs>
-    <radialGradient id="bg" cx=".18" cy=".06" r="1.1">
-      <stop stop-color="#102B43"/>
-      <stop offset=".62" stop-color="#07111F"/>
-      <stop offset="1" stop-color="#040A12"/>
+    <radialGradient id="bg" cx=".12" cy=".06" r="1.15">
+      <stop stop-color="#12385E"/><stop offset=".54" stop-color="#071727"/><stop offset="1" stop-color="#030A12"/>
     </radialGradient>
-    <linearGradient id="top" x1="78" y1="82" x2="418" y2="288" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#31E6C6"/>
-      <stop offset="1" stop-color="#0EA5C6"/>
+    <linearGradient id="teal" x1="95" y1="105" x2="330" y2="338" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#20E1D4"/><stop offset=".6" stop-color="#12C9C3"/><stop offset="1" stop-color="#078B9E"/>
     </linearGradient>
-    <linearGradient id="bottom" x1="94" y1="430" x2="434" y2="224" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#2563EB"/>
-      <stop offset="1" stop-color="#8B5CF6"/>
+    <linearGradient id="blue" x1="166" y1="407" x2="414" y2="214" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1748D0"/><stop offset=".56" stop-color="#1966EA"/><stop offset="1" stop-color="#3096FF"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="237" y1="277" x2="312" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF7358"/><stop offset="1" stop-color="#F0442F"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
-  <circle cx="94" cy="78" r="148" fill="#2DD4BF" opacity=".07"/>
-  <circle cx="438" cy="438" r="172" fill="#6366F1" opacity=".09"/>
-  <path d="M382 82H202C126 82 78 126 78 187s48 101 124 101h111c20 0 36-16 36-36s-16-36-36-36H202c-29 0-50-12-50-31s21-31 50-31h180c20 0 36-16 36-36s-16-36-36-36Z" fill="url(#top)"/>
-  <path d="M130 430h180c76 0 124-44 124-105s-48-101-124-101H199c-20 0-36 16-36 36s16 36 36 36h111c29 0 50 12 50 31s-21 31-50 31H130c-20 0-36 16-36 36s16 36 36 36Z" fill="url(#bottom)"/>
-  <g fill="#D8FFFA" opacity=".95">
-    <circle cx="330" cy="118" r="9"/><circle cx="358" cy="118" r="9"/><circle cx="386" cy="118" r="9"/>
-  </g>
-  <g fill="#DDE7FF" opacity=".95">
-    <circle cx="126" cy="394" r="9"/><circle cx="154" cy="394" r="9"/><circle cx="182" cy="394" r="9"/>
-  </g>
-  <circle cx="256" cy="256" r="31" fill="#FF624A"/>
-  <circle cx="247" cy="247" r="9" fill="#FFB3A7" opacity=".78"/>
+  <path d="M350-14h86L230 192h-86zM454 70h48L378 194h-48zM72 334h64L-6 476v-64z" fill="#2D6CA6" opacity=".08"/>
+  <path d="M86 208 198 96h210l-62 62H222l-62 62 84 84h74l-50 50h-48L86 220z" fill="#006B7B" opacity=".9" transform="translate(0 9)"/>
+  <path d="M86 208 198 96h210l-62 62H222l-62 62 84 84h74l-50 50h-48L86 220z" fill="url(#teal)"/>
+  <path d="M233 289h54l31 31h-54z" fill="#A72521" opacity=".8" transform="translate(0 7)"/>
+  <path d="M233 289h54l31 31h-54z" fill="url(#coral)"/>
+  <path d="M244 216h58l124 124-92 92H112l62-62h134l56-56-74-74h-22z" fill="#0A318B" opacity=".95" transform="translate(0 10)"/>
+  <path d="M244 216h58l124 124-92 92H112l62-62h134l56-56-74-74h-22z" fill="url(#blue)"/>
+  <path d="M198 96h210l-14 14H204L100 214l-14-6zM244 216h58l12 12h-60zM174 370h134l-14 14H160z" fill="#B7FFFF" opacity=".32"/>
 </svg>

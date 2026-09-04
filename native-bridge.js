@@ -345,9 +345,13 @@ export async function shareScheduledGame(game) {
   const title = gameTitle(game);
   const when = new Date(game.startsAt).toLocaleString([], { dateStyle:'medium', timeStyle:'short' });
   const text = [title, sportName(game.sport), when, game.venue].filter(Boolean).join(' · ');
+  return shareContent({ title, text, dialogTitle:'Share game' });
+}
+
+export async function shareContent({ title = 'Scorer', text = '', dialogTitle = 'Share from Scorer' } = {}) {
   const share = plugin('Share');
   if (share) {
-    await share.share({ title, text, dialogTitle:'Share game' });
+    await share.share({ title, text, dialogTitle });
     return { native:true, shared:true };
   }
   if (navigator.share) {

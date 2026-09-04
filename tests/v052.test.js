@@ -31,18 +31,22 @@ test('v0.5.2 exposes an accessible persistent appearance picker', async () => {
 });
 
 test('v0.5.2 carries the new Scorer mark into web and Android launch assets', async () => {
-  const [svg, launcher, notification, html] = await Promise.all([
+  const [svg, launcher, notification, adaptive, themed, html] = await Promise.all([
     readFile(new URL('../assets/app-icon.svg', import.meta.url), 'utf8'),
     readFile(new URL('../android/app/src/main/res/drawable/ic_launcher.xml', import.meta.url), 'utf8'),
     readFile(new URL('../android/app/src/main/res/drawable/ic_stat_scorer.xml', import.meta.url), 'utf8'),
+    readFile(new URL('../android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml', import.meta.url), 'utf8'),
+    readFile(new URL('../android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml', import.meta.url), 'utf8'),
     readFile(new URL('../index.html', import.meta.url), 'utf8')
   ]);
   assert.match(svg, /abstract S/i);
-  assert.match(svg, /#FF624A/i);
+  assert.match(svg, /#F0442F/i);
   assert.doesNotMatch(svg, />8<|>6</);
-  assert.match(launcher, /#2DD4BF/);
-  assert.match(launcher, /#6366F1/);
+  assert.match(launcher, /#20D7CF/);
+  assert.match(launcher, /#1C6FF2/);
   assert.match(notification, /viewportWidth="512"/);
+  assert.match(adaptive, /adaptive-icon/);
+  assert.match(themed, /monochrome/);
   assert.match(html, /brand-icon/);
 });
 
