@@ -64,6 +64,17 @@ test('Android instrumentation verifies the real Capacitor-to-notification-manage
   assert.match(workflow, /api-level: 35/);
 });
 
+test('cold Android reminder view exposes the immediate action before full diagnostics finish', async () => {
+  const ui = await readFile(new URL('../v040.js', import.meta.url), 'utf8');
+  const start = ui.indexOf('async function openSchedule()');
+  const end = ui.indexOf('function closeSchedule()', start);
+  const openSchedule = ui.slice(start, end);
+  const firstRender = openSchedule.indexOf('renderNativeStatus();');
+  const diagnostics = openSchedule.indexOf('await reminderDiagnostics()');
+  assert.ok(firstRender >= 0);
+  assert.ok(diagnostics > firstRender);
+});
+
 test('current version is aligned across release surfaces', async () => {
   const version = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));

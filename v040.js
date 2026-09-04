@@ -93,8 +93,15 @@ async function openSchedule() {
   $('v040ScheduleModal').classList.remove('hidden');
   $('v040ScheduleModal').setAttribute('aria-hidden','false');
   capability = await notificationCapability();
-  reminderHealth = nativePlatform() ? await reminderDiagnostics() : null;
+  // A cold Android WebView can take several seconds to query channels and
+  // delivered notifications. Expose the permission-based action immediately,
+  // then fill in the deeper diagnostics when they arrive.
+  reminderHealth = null;
   renderNativeStatus();
+  if (nativePlatform()) {
+    reminderHealth = await reminderDiagnostics();
+    renderNativeStatus();
+  }
   if (highlightId) {
     setTimeout(() => {
       document.querySelector(`[data-v040-game="${cssEscape(highlightId)}"]`)?.scrollIntoView({ behavior:'smooth', block:'center' });
