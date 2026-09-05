@@ -85,20 +85,28 @@ public class CricketGoldQcTest {
 
             evaluate(webView, "document.getElementById('fullScoreboardBtn').click(); 'opened'");
             waitForJsTrue(webView,
-                "(() => { const gold=document.querySelector('#fullScoreboardContent [data-cricket-gold-scorecard=true]'); const text=document.getElementById('fullScoreboardContent')?.innerText||''; return Boolean(gold && text.includes('India') && text.includes('Pakistan') && text.includes('Yet to bat') && text.includes('Fall of wickets') && text.includes('Bowling') && text.includes('WD') && text.includes('NB')); })()",
+                "Boolean(document.querySelector('#fullScoreboardContent [data-cricket-gold-scorecard=\"true\"]') && !document.getElementById('fullScoreboardModal').classList.contains('hidden'))",
                 8000,
-                "Cricket Gold full scorecard"
+                "authoritative Cricket Gold full-scorecard layer"
             );
+            assertScorecardContains(webView, "India", "India team name");
+            assertScorecardContains(webView, "Pakistan", "Pakistan team name");
+            assertScorecardContains(webView, "Yet to bat", "Yet to bat section");
+            assertScorecardContains(webView, "Fall of wickets", "Fall of wickets section");
+            assertScorecardContains(webView, "Bowling", "Bowling section");
+            assertScorecardContains(webView, "WD", "bowling wides column");
+            assertScorecardContains(webView, "NB", "bowling no-balls column");
 
             // Score another legal dot while the scorecard overlay is open. app.js
             // rerenders its normal full scorecard on every state change; the Gold
-            // layer must restore the enhanced Cricket card immediately.
+            // observer must restore the enhanced Cricket card immediately.
             clickDeliveryAndWait(webView, "0", "s.teamA.balls===4");
             waitForJsTrue(webView,
-                "Boolean(document.querySelector('#fullScoreboardContent [data-cricket-gold-scorecard=true]'))",
+                "Boolean(document.querySelector('#fullScoreboardContent [data-cricket-gold-scorecard=\"true\"]'))",
                 8000,
                 "live Cricket Gold scorecard after a scoring rerender"
             );
+            assertScorecardContains(webView, "0.4", "updated live over count");
 
             assertTrue("Cricket share control should remain available",
                 "true".equals(evaluate(webView,
@@ -106,6 +114,15 @@ public class CricketGoldQcTest {
                 ))
             );
         }
+    }
+
+    private void assertScorecardContains(WebView webView, String text, String description) throws Exception {
+        String escaped = text.replace("\\", "\\\\").replace("'", "\\'");
+        assertTrue("Packaged Cricket Gold scorecard is missing " + description + " (expected text: " + text + ")",
+            "true".equals(evaluate(webView,
+                "Boolean((document.getElementById('fullScoreboardContent')?.innerText||'').includes('" + escaped + "'))"
+            ))
+        );
     }
 
     private void clickDeliveryAndWait(WebView webView, String value, String statePredicate) throws Exception {
