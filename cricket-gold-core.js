@@ -207,7 +207,7 @@ function bowlingRowsMarkup(state, battingSide) {
 function fallOfWicketsMarkup(state, side) {
   const list = cricket(state).dismissals?.[side] || [];
   if (!list.length) return '';
-  const text = list.map(item => `${num(item.score)}/${num(item.wicket)} (${item.batter || 'wicket'}, ${formatOvers(item.ball || 0)} ov)`).join(', ');
+  const text = list.map(item => `${num(item.wicket)}-${num(item.score)} (${item.batter || 'wicket'}, ${formatOvers(item.ball || 0)} ov)`).join(', ');
   return `<section class="cricket-gold-inline"><h4>Fall of wickets</h4><p>${esc(text)}</p></section>`;
 }
 
