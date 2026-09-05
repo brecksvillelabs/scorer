@@ -1,0 +1,6 @@
+.exit-display{
+  left:50%;
+  right:auto;
+  bottom:calc(14px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+}
