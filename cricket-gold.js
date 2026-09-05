@@ -7,6 +7,7 @@ import { shareContent } from './native-bridge.js';
 const STATE_KEY = 'scorer-state-v2';
 let rosterSide = 'A';
 let installed = false;
+let scorecardObserver = null;
 
 function $(id) { return document.getElementById(id); }
 function readState() {
@@ -199,14 +200,32 @@ function persistRosterIfSaved(side, message = 'Roster saved') {
 
 function refreshCricketFullScorecard() {
   const state = readState();
-  if (state?.sport !== 'cricket') return;
+  const sheetShare = $('shareScoreSheetBtn');
+  if (state?.sport !== 'cricket') {
+    if (sheetShare) sheetShare.textContent = 'Share score';
+    return;
+  }
   const host = $('fullScoreboardContent');
   if (!host) return;
   host.innerHTML = cricketGoldScorecardMarkup(state);
   const title = $('fullScoreboardTitle');
   if (title) title.textContent = 'Cricket full scorecard';
-  const sheetShare = $('shareScoreSheetBtn');
   if (sheetShare) sheetShare.textContent = 'Share / WhatsApp';
+}
+
+function installScorecardObserver() {
+  if (scorecardObserver || typeof MutationObserver === 'undefined') return;
+  const host = $('fullScoreboardContent');
+  if (!host) return;
+  scorecardObserver = new MutationObserver(() => {
+    const state = readState();
+    const modal = $('fullScoreboardModal');
+    if (state?.sport !== 'cricket' || modal?.classList.contains('hidden')) return;
+    if (!host.querySelector('[data-cricket-gold-scorecard="true"]')) {
+      queueMicrotask(refreshCricketFullScorecard);
+    }
+  });
+  scorecardObserver.observe(host, { childList:true });
 }
 
 async function shareCricketState(state) {
@@ -270,6 +289,7 @@ export function installCricketGold() {
   ensureRosterModal();
   ensureRosterButtons();
   installClickHandlers();
+  installScorecardObserver();
   document.addEventListener('scorer:theme-changed', () => ensureRosterButtons());
 }
 
