@@ -133,7 +133,8 @@ function bowlerDerivedMap(state, battingSide) {
   };
 
   const finishOver = () => {
-    if (!currentOver || currentOver.legal !== 6) return;
+    if (!currentOver || currentOver.finished || currentOver.legal !== 6) return;
+    currentOver.finished = true;
     if (currentOver.bowlers.size === 1 && currentOver.runs === 0) {
       const [name] = [...currentOver.bowlers];
       rowFor(name).maidens += 1;
@@ -146,7 +147,7 @@ function bowlerDerivedMap(state, battingSide) {
     const overIndex = Math.floor(legalBalls / 6);
     if (!currentOver || currentOver.index !== overIndex) {
       finishOver();
-      currentOver = { index:overIndex, legal:0, runs:0, bowlers:new Set() };
+      currentOver = { index:overIndex, legal:0, runs:0, bowlers:new Set(), finished:false };
     }
     const bowler = String(event.bowler || 'Unknown bowler');
     const row = rowFor(bowler);
@@ -161,6 +162,7 @@ function bowlerDerivedMap(state, battingSide) {
       if (currentOver.legal === 6) finishOver();
     }
   }
+  finishOver();
   return derived;
 }
 
