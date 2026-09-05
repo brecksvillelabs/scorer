@@ -1,3 +1,5 @@
+import './cricket-gold.js';
+
 export const THEME_KEY = 'scorer-theme-v1';
 export const THEME_OPTIONS = Object.freeze(['system', 'light', 'dark']);
 
