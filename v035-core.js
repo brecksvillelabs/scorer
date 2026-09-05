@@ -53,6 +53,7 @@ export function createScorerState(options, baseCreateInitialState) {
       shotClockSeconds,
       shotClock: shotClockSeconds,
       shotClockRunning: false,
+      restartType: null,
       matchWinner: null
     };
     return next;
@@ -75,6 +76,9 @@ export function createScorerState(options, baseCreateInitialState) {
     raidClock: raidSeconds,
     raidRunning: false,
     raidPoints: 0,
+    pendingTouchPoints: 0,
+    pendingBonusPoints: 0,
+    emptyRaidStreak: { A: 0, B: 0 },
     raidsCompleted: { A: 0, B: 0 },
     timeoutsPerHalf: 2,
     timeouts: { A: 2, B: 2 },
@@ -94,6 +98,10 @@ export function lacrosseGoal(state, side, delta = 1) {
     next.lacrosse.shotClockRunning = false;
   }
   if (delta > 0 && next.lacrosse.discipline === 'sixes') next.lacrosse.possession = otherSide(side);
+  else if (delta > 0) {
+    next.lacrosse.possession = null;
+    next.lacrosse.restartType = 'faceoff/draw';
+  }
   next.updatedAt = Date.now();
   return next;
 }
@@ -102,6 +110,7 @@ export function setLacrossePossession(state, side) {
   const next = clone(state);
   if (next.sport !== 'lacrosse' || !next.lacrosse || !['A','B'].includes(side)) return next;
   next.lacrosse.possession = side;
+  next.lacrosse.restartType = null;
   if (next.lacrosse.shotClockSeconds > 0) {
     next.lacrosse.shotClock = next.lacrosse.shotClockSeconds;
     next.lacrosse.shotClockRunning = false;
@@ -135,10 +144,14 @@ export function lacrosseShotClockAction(state, action) {
 export function setKabaddiRaid(state, side) {
   const next = clone(state);
   if (next.sport !== 'kabaddi' || !next.kabaddi || !['A','B'].includes(side)) return next;
+  ensureKabaddiState(next.kabaddi);
   next.kabaddi.raidingTeam = side;
+  if (next.period === 1 && Number(next.kabaddi.raidsCompleted.A || 0) + Number(next.kabaddi.raidsCompleted.B || 0) === 0) next.kabaddi.firstHalfStartingRaid = side;
   next.kabaddi.raidClock = next.kabaddi.raidSeconds;
   next.kabaddi.raidRunning = false;
   next.kabaddi.raidPoints = 0;
+  next.kabaddi.pendingTouchPoints = 0;
+  next.kabaddi.pendingBonusPoints = 0;
   appendEvent(next, 'kabaddi.raid_started', { side });
   next.updatedAt = Date.now();
   return next;
@@ -147,6 +160,7 @@ export function setKabaddiRaid(state, side) {
 export function kabaddiRaidClockAction(state, action) {
   const next = clone(state);
   if (next.sport !== 'kabaddi' || !next.kabaddi) return next;
+  ensureKabaddiState(next.kabaddi);
   if (action === 'reset') {
     next.kabaddi.raidClock = next.kabaddi.raidSeconds;
     next.kabaddi.raidRunning = false;
@@ -156,14 +170,54 @@ export function kabaddiRaidClockAction(state, action) {
   return next;
 }
 
-function finishRaid(next, reason) {
-  const current = next.kabaddi.raidingTeam;
-  next.kabaddi.raidsCompleted[current] = Number(next.kabaddi.raidsCompleted[current] || 0) + 1;
-  appendEvent(next, 'kabaddi.raid_ended', { side: current, reason, raidPoints: next.kabaddi.raidPoints });
-  next.kabaddi.raidingTeam = otherSide(current);
-  next.kabaddi.raidClock = next.kabaddi.raidSeconds;
-  next.kabaddi.raidRunning = false;
-  next.kabaddi.raidPoints = 0;
+function ensureKabaddiState(k) {
+  k.pendingTouchPoints = Number(k.pendingTouchPoints || 0);
+  k.pendingBonusPoints = Number(k.pendingBonusPoints || 0);
+  k.raidPoints = k.pendingTouchPoints + k.pendingBonusPoints;
+  k.emptyRaidStreak ||= { A:0, B:0 };
+  k.emptyRaidStreak.A = Number(k.emptyRaidStreak.A || 0);
+  k.emptyRaidStreak.B = Number(k.emptyRaidStreak.B || 0);
+}
+
+function addKabaddiScore(next, side, points, type, details = {}) {
+  if (!points) return;
+  next[teamKey(side)].score += points;
+  appendEvent(next,type,{ side, points, ...details, scoreA:next.teamA.score, scoreB:next.teamB.score });
+}
+
+function finishRaid(next, reason, defensePoints = 0) {
+  const k = next.kabaddi;
+  ensureKabaddiState(k);
+  const current = k.raidingTeam;
+  const defense = otherSide(current);
+  const awardTouch = reason === 'completed' ? k.pendingTouchPoints : 0;
+  const awardBonus = reason === 'completed' || reason === 'tackle' || reason === 'super-tackle' || reason === 'expired' ? k.pendingBonusPoints : 0;
+  const raidAward = awardTouch + awardBonus;
+  addKabaddiScore(next,current,raidAward,'kabaddi.raid_points_committed',{ touchPoints:awardTouch, bonusPoints:awardBonus, reason });
+
+  let resolvedReason = reason;
+  if (reason === 'completed' && raidAward === 0) resolvedReason = 'empty';
+  if (resolvedReason === 'empty') {
+    const isDoOrDie = k.emptyRaidStreak[current] >= 2;
+    if (isDoOrDie) {
+      addKabaddiScore(next,defense,1,'kabaddi.do_or_die_out',{ raidingTeam:current });
+      resolvedReason = 'do-or-die-out';
+      k.emptyRaidStreak[current] = 0;
+    } else k.emptyRaidStreak[current] += 1;
+  } else k.emptyRaidStreak[current] = 0;
+
+  addKabaddiScore(next,defense,defensePoints,defensePoints === 2 ? 'kabaddi.super_tackle_point' : 'kabaddi.tackle_point',{ raidingTeam:current, reason:resolvedReason });
+  k.raidsCompleted[current] = Number(k.raidsCompleted[current] || 0) + 1;
+  appendEvent(next, 'kabaddi.raid_ended', {
+    side: current, reason: resolvedReason, touchPoints:awardTouch, bonusPoints:awardBonus,
+    defensePoints, scoreA:next.teamA.score, scoreB:next.teamB.score
+  });
+  k.raidingTeam = otherSide(current);
+  k.raidClock = k.raidSeconds;
+  k.raidRunning = false;
+  k.raidPoints = 0;
+  k.pendingTouchPoints = 0;
+  k.pendingBonusPoints = 0;
 }
 
 function parseAwardSide(side, suffix) {
@@ -174,30 +228,30 @@ function parseAwardSide(side, suffix) {
 
 export function kabaddiAction(state, action, side = null) {
   const next = clone(state);
-  if (next.sport !== 'kabaddi' || !next.kabaddi) return next;
+  if (next.sport !== 'kabaddi' || !next.kabaddi || next.finished) return next;
+  ensureKabaddiState(next.kabaddi);
   const raidSide = next.kabaddi.raidingTeam;
   const defenseSide = otherSide(raidSide);
 
   if (action === 'touch' || action === 'bonus') {
-    next[teamKey(raidSide)].score += 1;
-    next.kabaddi.raidPoints += 1;
-    appendEvent(next, action === 'touch' ? 'kabaddi.touch_point' : 'kabaddi.bonus_point', { side: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
+    if (action === 'touch') next.kabaddi.pendingTouchPoints += 1;
+    else next.kabaddi.pendingBonusPoints += 1;
+    next.kabaddi.raidPoints = next.kabaddi.pendingTouchPoints + next.kabaddi.pendingBonusPoints;
+    appendEvent(next, action === 'touch' ? 'kabaddi.touch_pending' : 'kabaddi.bonus_pending', { side: raidSide, pending:next.kabaddi.raidPoints });
   } else if (action === 'allOut') {
     const awardSide = ['A','B'].includes(side) ? side : raidSide;
     next[teamKey(awardSide)].score += 2;
-    if (awardSide === raidSide) next.kabaddi.raidPoints += 2;
     appendEvent(next, 'kabaddi.all_out_bonus', { side: awardSide, points: 2, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
   } else if (action === 'tackle') {
-    next[teamKey(defenseSide)].score += 1;
-    appendEvent(next, 'kabaddi.tackle_point', { side: defenseSide, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
-    finishRaid(next, 'tackle');
+    finishRaid(next, 'tackle', 1);
+  } else if (action === 'superTackle') {
+    finishRaid(next, 'super-tackle', 2);
   } else if (action === 'empty') finishRaid(next, 'empty');
   else if (action === 'end') finishRaid(next, 'completed');
   else if (action === 'technical') {
     const allOutSide = parseAwardSide(side, 'allOut');
     if (allOutSide) {
       next[teamKey(allOutSide)].score += 2;
-      if (allOutSide === raidSide) next.kabaddi.raidPoints += 2;
       appendEvent(next, 'kabaddi.all_out_bonus', { side: allOutSide, points: 2, raidingTeam: raidSide, scoreA: next.teamA.score, scoreB: next.teamB.score });
     } else if (['A','B'].includes(side)) {
       next[teamKey(side)].score += 1;
@@ -222,10 +276,12 @@ export function tickScorerClock(state, baseTickClock) {
     }
   }
   if (next.sport === 'kabaddi' && next.kabaddi?.raidRunning && next.kabaddi.raidClock > 0) {
+    ensureKabaddiState(next.kabaddi);
     next.kabaddi.raidClock = Math.max(0, next.kabaddi.raidClock - 1);
     if (next.kabaddi.raidClock === 0) {
       next.kabaddi.raidRunning = false;
       appendEvent(next, 'kabaddi.raid_clock_expired', { raidingTeam: next.kabaddi.raidingTeam });
+      finishRaid(next,'expired',1);
     }
   }
   next.updatedAt = Date.now();
@@ -233,6 +289,7 @@ export function tickScorerClock(state, baseTickClock) {
 }
 
 export function advanceScorerPeriod(state, delta, baseAdvancePeriod) {
+  if (state?.sport === 'kabaddi' && delta > 0 && (state.kabaddi?.raidRunning || Number(state.kabaddi?.raidPoints || 0) > 0)) return clone(state);
   const before = Number(state.period || 1);
   const next = baseAdvancePeriod(state, delta);
   if (next.period === before) return next;
@@ -240,6 +297,8 @@ export function advanceScorerPeriod(state, delta, baseAdvancePeriod) {
   if (next.sport === 'lacrosse' && next.lacrosse) {
     next.lacrosse.shotClock = next.lacrosse.shotClockSeconds;
     next.lacrosse.shotClockRunning = false;
+    next.lacrosse.possession = null;
+    next.lacrosse.restartType = 'period restart';
     if (before === 2 && next.period === 3) {
       const count = next.lacrosse.discipline === 'sixes' ? 1 : 2;
       next.lacrosse.timeoutsPerHalf = count;
@@ -254,6 +313,8 @@ export function advanceScorerPeriod(state, delta, baseAdvancePeriod) {
     next.kabaddi.raidClock = next.kabaddi.raidSeconds;
     next.kabaddi.raidRunning = false;
     next.kabaddi.raidPoints = 0;
+    next.kabaddi.pendingTouchPoints = 0;
+    next.kabaddi.pendingBonusPoints = 0;
   }
   return next;
 }

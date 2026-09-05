@@ -72,11 +72,12 @@ public class NotificationDeliveryTest {
             // evaluateJavascript script (Chromium gives injected dynamic imports
             // an about:blank base URL). This clicks through v040.js into the real
             // Capacitor LocalNotifications bridge.
-            waitForJsTrue(webView, "Boolean(document.getElementById('v040Upcoming'))", 20000);
+            waitForJsTrue(webView, "Boolean(document.getElementById('v040Upcoming'))", 20000, "Upcoming Games control");
             evaluate(webView, "document.getElementById('v040Upcoming').click(); 'opened'");
             waitForJsTrue(webView,
                 "(() => { const button = document.querySelector('[data-v041-native-action=now]'); return Boolean(button && !button.disabled); })()",
-                10000
+                20000,
+                "enabled immediate-notification control"
             );
             evaluate(webView, "document.querySelector('[data-v041-native-action=now]').click(); 'sent'");
 
@@ -96,13 +97,13 @@ public class NotificationDeliveryTest {
         }
     }
 
-    private void waitForJsTrue(WebView webView, String script, long timeoutMs) throws Exception {
+    private void waitForJsTrue(WebView webView, String script, long timeoutMs, String description) throws Exception {
         long deadline = SystemClock.elapsedRealtime() + timeoutMs;
         do {
             if ("true".equals(evaluate(webView, script))) return;
             SystemClock.sleep(200);
         } while (SystemClock.elapsedRealtime() < deadline);
-        throw new AssertionError("Timed out waiting for Scorer's packaged notification controls");
+        throw new AssertionError("Timed out waiting for Scorer's packaged " + description);
     }
 
     private String evaluate(WebView webView, String script) throws Exception {

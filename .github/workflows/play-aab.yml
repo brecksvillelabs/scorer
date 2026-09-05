@@ -72,7 +72,7 @@ jobs:
       - name: Upload Play Console bundle
         uses: actions/upload-artifact@v4
         with:
-          name: scorer-v0.5.1-play-aab
+          name: scorer-v0.5.2-play-aab
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             android/app/build/outputs/bundle/release/app-release.aab.sha256

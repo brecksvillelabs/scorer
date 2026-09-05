@@ -45,10 +45,16 @@ function resetHalf(next) {
   next.baseball.bases = { first: false, second: false, third: false };
 }
 
+function beginHalf(next) {
+  if (next.baseball.phase === 'mid_inning' || next.baseball.phase === 'end_inning') next.baseball.phase = 'live';
+}
+
 function finish(next, side, reason) {
   next.finished = true;
   next.winner = side;
   next.baseball.matchWinner = side;
+  next.baseball.phase = 'final';
+  next.baseball.finishReason = reason;
   appendEvent(next, 'baseball.game_finished', { winner: side, reason, scoreA: next.teamA.score, scoreB: next.teamB.score });
 }
 
@@ -76,6 +82,8 @@ export function createBaseballState(options = {}, baseCreateInitialState) {
     errors: { A: 0, B: 0 },
     runsByInning: { A: [], B: [] },
     bases: { first: false, second: false, third: false },
+    phase: 'live',
+    finishReason: null,
     matchWinner: null
   };
   // Only the half-inning currently in progress receives a 0. Future/unplayed
@@ -96,6 +104,7 @@ export function baseballRun(state, delta = 1) {
   const next = clone(state);
   const b = next.baseball;
   if (next.sport !== 'baseball' || !b || next.finished) return next;
+  beginHalf(next);
   const side = b.battingTeam;
   const list = inningSlot(next, side);
   const current = Number(list[b.inning - 1] || 0);
@@ -118,10 +127,15 @@ export function baseballRun(state, delta = 1) {
 export function baseballHit(state, delta = 1) {
   const next = clone(state);
   if (next.sport !== 'baseball' || !next.baseball || next.finished) return next;
+  beginHalf(next);
   const side = next.baseball.battingTeam;
-  next.baseball.hits[side] = Math.max(0, Number(next.baseball.hits[side] || 0) + Number(delta || 0));
-  if (delta > 0) resetCount(next);
-  appendEvent(next, delta >= 0 ? 'baseball.hit' : 'baseball.hit_corrected', { side, delta: Number(delta || 0), hits: next.baseball.hits[side] });
+  const before = Number(next.baseball.hits[side] || 0);
+  const after = Math.max(0,before + Number(delta || 0));
+  const actual = after - before;
+  if (!actual) return next;
+  next.baseball.hits[side] = after;
+  if (actual > 0) resetCount(next);
+  appendEvent(next, actual > 0 ? 'baseball.hit' : 'baseball.hit_corrected', { side, delta:actual, hits:after });
   next.updatedAt = Date.now();
   return next;
 }
@@ -129,10 +143,40 @@ export function baseballHit(state, delta = 1) {
 export function baseballError(state, delta = 1) {
   const next = clone(state);
   if (next.sport !== 'baseball' || !next.baseball || next.finished) return next;
+  beginHalf(next);
   const side = otherSide(next.baseball.battingTeam);
-  next.baseball.errors[side] = Math.max(0, Number(next.baseball.errors[side] || 0) + Number(delta || 0));
-  if (delta > 0) resetCount(next);
-  appendEvent(next, delta >= 0 ? 'baseball.error' : 'baseball.error_corrected', { side, delta: Number(delta || 0), errors: next.baseball.errors[side] });
+  const before = Number(next.baseball.errors[side] || 0);
+  const after = Math.max(0,before + Number(delta || 0));
+  const actual = after - before;
+  if (!actual) return next;
+  next.baseball.errors[side] = after;
+  if (actual > 0) resetCount(next);
+  appendEvent(next, actual > 0 ? 'baseball.error' : 'baseball.error_corrected', { side, delta:actual, errors:after });
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function baseballHomeRun(state) {
+  const next = clone(state);
+  const b = next.baseball;
+  if (next.sport !== 'baseball' || !b || next.finished) return next;
+  beginHalf(next);
+  const side = b.battingTeam;
+  const runs = 1 + ['first','second','third'].filter(base => b.bases[base]).length;
+  const list = inningSlot(next,side);
+  list[b.inning - 1] = Number(list[b.inning - 1] || 0) + runs;
+  next[teamKey(side)].score += runs;
+  b.hits[side] += 1;
+  b.bases = { first:false, second:false, third:false };
+  resetCount(next);
+  appendEvent(next,'baseball.home_run',{
+    side, runs, inning:b.inning, half:b.half, hits:b.hits[side],
+    scoreA:next.teamA.score, scoreB:next.teamB.score
+  });
+  if (b.half === 'bottom' && b.inning >= b.regulationInnings) {
+    const home = b.homeSide, away = otherSide(home);
+    if (next[teamKey(home)].score > next[teamKey(away)].score) finish(next,home,'walkoff-home-run');
+  }
   next.updatedAt = Date.now();
   return next;
 }
@@ -179,6 +223,7 @@ function awardFirstBase(next, reason) {
 export function baseballPitch(state, action) {
   const next = clone(state);
   if (next.sport !== 'baseball' || !next.baseball || next.finished) return next;
+  beginHalf(next);
   const b = next.baseball;
   if (action === 'ball') {
     b.balls += 1;
@@ -199,6 +244,7 @@ export function baseballPitch(state, action) {
 export function baseballPlateAppearance(state, action) {
   const next = clone(state);
   if (next.sport !== 'baseball' || !next.baseball || next.finished) return next;
+  beginHalf(next);
   if (action === 'out') return addOut(next, 'manual');
   if (action === 'walk') return awardFirstBase(next, 'walk');
   if (action === 'hbp') return awardFirstBase(next, 'hbp');
@@ -208,6 +254,7 @@ export function baseballPlateAppearance(state, action) {
 export function toggleBase(state, base) {
   const next = clone(state);
   if (next.sport !== 'baseball' || !next.baseball || !['first','second','third'].includes(base)) return next;
+  beginHalf(next);
   next.baseball.bases[base] = !next.baseball.bases[base];
   appendEvent(next, 'baseball.base_state', { base, occupied: next.baseball.bases[base], bases: { ...next.baseball.bases } });
   next.updatedAt = Date.now();
@@ -239,6 +286,7 @@ export function advanceBaseballHalf(state, reason = 'manual') {
     }
     b.half = 'bottom';
     b.battingTeam = home;
+    b.phase = 'mid_inning';
     inningSlot(next, home);
   } else {
     if (b.inning >= b.regulationInnings && next.teamA.score !== next.teamB.score) {
@@ -251,6 +299,7 @@ export function advanceBaseballHalf(state, reason = 'manual') {
     next.period = b.inning;
     b.half = 'top';
     b.battingTeam = b.firstBat;
+    b.phase = 'end_inning';
     inningSlot(next, b.firstBat);
   }
   resetHalf(next);

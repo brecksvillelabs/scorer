@@ -55,7 +55,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scorer-v0.5.1-notification-test-reports
+          name: scorer-v0.5.2-notification-test-reports
           path: |
             android/app/build/reports/androidTests/connected/
             android/app/build/outputs/androidTest-results/connected/
@@ -64,7 +64,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: scorer-v0.5.1-debug-apk
+          name: scorer-v0.5.2-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
@@ -141,7 +141,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scorer-v0.5.1-android16-release-test-reports
+          name: scorer-v0.5.2-android16-release-test-reports
           path: |
             android/app/build/reports/androidTests/connected/
             android/app/build/outputs/androidTest-results/connected/
@@ -150,7 +150,7 @@ jobs:
       - name: Upload CI-only release bundle
         uses: actions/upload-artifact@v4
         with:
-          name: scorer-v0.5.1-ci-only-not-for-play-aab
+          name: scorer-v0.5.2-ci-only-not-for-play-aab
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             android/app/build/outputs/bundle/release/app-release.aab.sha256

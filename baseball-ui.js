@@ -16,12 +16,13 @@ export function baseballBoardMarkup(state, helpers) {
   const columns = Math.max(b.regulationInnings, b.inning);
   const innings = Array.from({ length: columns }, (_, i) => i + 1);
   const baseClass = key => b.bases[key] ? 'occupied' : '';
-  const half = b.half === 'bottom' ? 'BOTTOM' : 'TOP';
+  const half = b.phase === 'mid_inning' ? 'MID' : b.phase === 'end_inning' ? 'END' : b.half === 'bottom' ? 'BOTTOM' : 'TOP';
+  const statusInning = b.phase === 'end_inning' ? Math.max(1,b.inning - 1) : b.inning;
   const lineOrder = [b.firstBat, b.homeSide];
 
   return `<section class="v035-baseball-board">
     <div class="v035-baseball-hero">
-      <div><div class="eyebrow">BASEBALL · ${half} ${b.inning}</div><strong>${esc(batting.name)} batting</strong><div class="team-sub">vs ${esc(fielding.name)}</div></div>
+      <div><div class="eyebrow">BASEBALL · ${half} ${statusInning}</div><strong>${b.phase === 'mid_inning' || b.phase === 'end_inning' ? `${esc(batting.name)} bats next` : `${esc(batting.name)} batting`}</strong><div class="team-sub">vs ${esc(fielding.name)}</div></div>
       <div class="v035-bso" aria-label="Ball strike out count"><span><small>B</small><b>${b.balls}</b></span><span><small>S</small><b>${b.strikes}</b></span><span><small>O</small><b>${b.outs}</b></span></div>
     </div>
 
@@ -40,6 +41,7 @@ export function baseballBoardMarkup(state, helpers) {
       <button class="score-btn" data-action="baseball-pitch" data-value="foul">Foul</button>
       <button class="score-btn danger" data-action="baseball-pa" data-value="out">Out +1</button>
       <button class="score-btn primary" data-action="baseball-run" data-delta="1">Run +1</button>
+      <button class="score-btn primary" data-action="baseball-home-run">Home run</button>
       <button class="score-btn primary" data-action="baseball-hit" data-delta="1">Hit +1</button>
       <button class="score-btn" data-action="baseball-error" data-delta="1">${esc(fielding.name)} error +1</button>
       <button class="score-btn" data-action="baseball-pa" data-value="walk">Walk</button>

@@ -64,16 +64,30 @@ test('Android instrumentation verifies the real Capacitor-to-notification-manage
   assert.match(workflow, /api-level: 35/);
 });
 
+test('cold Android reminder view exposes the immediate action before full diagnostics finish', async () => {
+  const ui = await readFile(new URL('../v040.js', import.meta.url), 'utf8');
+  const start = ui.indexOf('async function openSchedule()');
+  const end = ui.indexOf('function closeSchedule()', start);
+  const openSchedule = ui.slice(start, end);
+  const firstRender = openSchedule.indexOf('renderNativeStatus();');
+  const diagnostics = openSchedule.indexOf('await reminderDiagnostics()');
+  assert.ok(firstRender >= 0);
+  assert.ok(diagnostics > firstRender);
+});
+
 test('current version is aligned across release surfaces', async () => {
   const version = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
   const prep = await readFile(new URL('../scripts/prepare-native.mjs', import.meta.url), 'utf8');
   const workflow = await readFile(new URL('../.github/workflows/android.yml', import.meta.url), 'utf8');
-  assert.equal(version, '0.5.1');
+  assert.match(version, /^\d+\.\d+\.\d+$/);
   assert.equal(pkg.version, version);
-  assert.match(gradle, /versionCode 501/);
-  assert.match(gradle, /versionName "0\.5\.1"/);
+  const [major, minor, patch] = version.split('.').map(Number);
+  const versionCode = major * 10000 + minor * 100 + patch;
+  const escapedVersion = version.replaceAll('.', '\\.');
+  assert.match(gradle, new RegExp(`versionCode ${versionCode}`));
+  assert.match(gradle, new RegExp(`versionName "${escapedVersion}"`));
   assert.match(prep, /const version =/);
-  assert.match(workflow, /scorer-v0\.5\.1-debug-apk/);
+  assert.match(workflow, new RegExp(`scorer-v${escapedVersion}-debug-apk`));
 });

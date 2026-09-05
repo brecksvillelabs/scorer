@@ -55,6 +55,7 @@ test('Play AAB workflow is manual, secret-gated, verified and non-publishing', a
   assert.match(workflow, /npm run check/);
   assert.match(workflow, /bundleRelease/);
   assert.match(workflow, /jarsigner -verify/);
-  assert.match(workflow, /scorer-v0\.5\.1-play-aab/);
+  const version = JSON.parse(await read('package.json')).version.replaceAll('.', '\\.');
+  assert.match(workflow, new RegExp(`scorer-v${version}-play-aab`));
   assert.doesNotMatch(workflow, /publish|playPublisher|serviceAccount/i);
 });

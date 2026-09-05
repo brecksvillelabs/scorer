@@ -4,7 +4,7 @@ import { createInitialState, swapSides } from '../sports.js';
 import {
   BASEBALL_SPORT_DEF, BASEBALL_RULE_PROFILE, createBaseballState, getBaseballPeriodText,
   baseballRun, baseballHit, baseballError, baseballPitch, baseballPlateAppearance,
-  toggleBase, advanceBaseballHalf, swapBaseballSides
+  toggleBase, advanceBaseballHalf, swapBaseballSides, baseballHomeRun
 } from '../baseball-core.js';
 
 test('baseball exposes a scoreboard profile', () => {
@@ -71,6 +71,7 @@ test('three strikes produce an out and three outs advance the half inning', () =
   assert.equal(state.baseball.inning, 1);
   assert.equal(state.baseball.battingTeam, 'A');
   assert.equal(state.baseball.outs, 0);
+  assert.equal(state.baseball.phase, 'mid_inning');
   assert.equal(getBaseballPeriodText(state), 'Bot 1');
 });
 
@@ -111,6 +112,28 @@ test('bottom-final go-ahead run ends the game as a walkoff', () => {
   state = baseballRun(state, 1);
   assert.equal(state.finished, true);
   assert.equal(state.winner, 'A');
+});
+
+test('walk-off home run records every run and the hit before finishing', () => {
+  let state = createBaseballState({ sport:'baseball', baseballInnings:1 },createInitialState);
+  state.teamB.score = 2;
+  state.baseball.runsByInning.B[0] = 2;
+  state = advanceBaseballHalf(state,'three-outs');
+  state = toggleBase(state,'first');
+  state = toggleBase(state,'second');
+  state = baseballHomeRun(state);
+  assert.equal(state.finished,true);
+  assert.equal(state.teamA.score,3);
+  assert.equal(state.baseball.hits.A,1);
+  assert.equal(state.baseball.finishReason,'walkoff-home-run');
+});
+
+test('zero-effect hit and error corrections do not append events', () => {
+  let state = createBaseballState({ sport:'baseball' },createInitialState);
+  const before = state.events.length;
+  state = baseballHit(state,-1);
+  state = baseballError(state,-1);
+  assert.equal(state.events.length,before);
 });
 
 test('tie after regulation continues to extra innings', () => {

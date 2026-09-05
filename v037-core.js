@@ -59,6 +59,11 @@ export function changeTimeout(state, side, delta) {
       limit
     });
     next.updatedAt = Date.now();
+    if (after < before) {
+      if (next.clock) next.clock.running = false;
+      if (next.lacrosse) next.lacrosse.shotClockRunning = false;
+      if (next.kabaddi) next.kabaddi.raidRunning = false;
+    }
   }
   return next;
 }

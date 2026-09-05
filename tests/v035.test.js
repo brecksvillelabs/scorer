@@ -74,17 +74,20 @@ test('kabaddi raid can accumulate multiple touch/bonus points before it ends', (
   state = kabaddiAction(state, 'touch');
   state = kabaddiAction(state, 'touch');
   state = kabaddiAction(state, 'bonus');
-  assert.equal(state.teamA.score, 3);
+  assert.equal(state.teamA.score, 0);
   assert.equal(state.kabaddi.raidPoints, 3);
   assert.equal(state.kabaddi.raidingTeam, 'A');
+  state = kabaddiAction(state,'end');
+  assert.equal(state.teamA.score,3);
+  assert.equal(state.kabaddi.raidingTeam,'B');
 });
 
 test('kabaddi All Out adds the separate two-point bonus without prematurely closing the raid', () => {
   let state = createScorerState({ sport: 'kabaddi' }, createInitialState);
   state = kabaddiAction(state, 'touch');
   state = kabaddiAction(state, 'allOut');
-  assert.equal(state.teamA.score, 3);
-  assert.equal(state.kabaddi.raidPoints, 3);
+  assert.equal(state.teamA.score, 2);
+  assert.equal(state.kabaddi.raidPoints, 1);
   assert.equal(state.kabaddi.raidingTeam, 'A');
   assert.equal(state.events.at(-1).type, 'kabaddi.all_out_bonus');
 });
@@ -108,6 +111,40 @@ test('kabaddi tackle awards defense and ends the raid', () => {
   assert.equal(state.kabaddi.raidClock, 30);
 });
 
+test('kabaddi tackle cancels pending touches but preserves a pending bonus', () => {
+  let state = createScorerState({ sport:'kabaddi', kabaddiFirstRaid:'A' },createInitialState);
+  state = kabaddiAction(state,'touch');
+  state = kabaddiAction(state,'bonus');
+  state = kabaddiAction(state,'tackle');
+  assert.equal(state.teamA.score,1);
+  assert.equal(state.teamB.score,1);
+});
+
+test('kabaddi super tackle awards two and raid expiry awards the defense', () => {
+  let superTackle = createScorerState({ sport:'kabaddi', kabaddiFirstRaid:'A' },createInitialState);
+  superTackle = kabaddiAction(superTackle,'superTackle');
+  assert.equal(superTackle.teamB.score,2);
+
+  let expired = createScorerState({ sport:'kabaddi', kabaddiFirstRaid:'A' },createInitialState);
+  expired.clock.running = false;
+  expired.kabaddi.raidRunning = true;
+  expired.kabaddi.raidClock = 1;
+  expired = tickScorerClock(expired,tickClock);
+  assert.equal(expired.teamB.score,1);
+  assert.equal(expired.kabaddi.raidingTeam,'B');
+});
+
+test('third consecutive empty raid is resolved as do-or-die out', () => {
+  let state = createScorerState({ sport:'kabaddi', kabaddiFirstRaid:'A' },createInitialState);
+  for (let cycle=0;cycle<2;cycle++) {
+    state = kabaddiAction(state,'empty');
+    state = kabaddiAction(state,'empty');
+  }
+  state = kabaddiAction(state,'empty');
+  assert.equal(state.teamB.score,1);
+  assert.equal(state.events.some(event=>event.type==='kabaddi.do_or_die_out'),true);
+});
+
 test('kabaddi empty raid changes raid ownership without changing score', () => {
   let state = createScorerState({ sport: 'kabaddi', kabaddiFirstRaid: 'B' }, createInitialState);
   state = kabaddiAction(state, 'empty');
@@ -124,6 +161,18 @@ test('kabaddi second half starts with the other first raider and restores two ti
   assert.equal(state.kabaddi.raidingTeam, 'B');
   assert.deepEqual(state.kabaddi.timeouts, { A: 2, B: 2 });
   assert.equal(getScorerPeriodText(state, () => ''), '2nd Half');
+});
+
+test('kabaddi keeps the half open until the last raid is resolved', () => {
+  let state = createScorerState({ sport: 'kabaddi', kabaddiFirstRaid: 'A' }, createInitialState);
+  state.clock.seconds = 0;
+  state.kabaddi.raidRunning = true;
+  state = advanceScorerPeriod(state, 1, advancePeriod);
+  assert.equal(state.period, 1);
+
+  state = kabaddiAction(state, 'empty');
+  state = advanceScorerPeriod(state, 1, advancePeriod);
+  assert.equal(state.period, 2);
 });
 
 test('raid and lacrosse shot clocks can tick independently of the game clock', () => {
@@ -147,5 +196,5 @@ test('side swap preserves lacrosse and kabaddi ownership semantics', () => {
   kabaddi = setKabaddiRaid(kabaddi, 'B');
   kabaddi = swapScorerSides(kabaddi, swapSides);
   assert.equal(kabaddi.kabaddi.raidingTeam, 'A');
-  assert.equal(kabaddi.kabaddi.firstHalfStartingRaid, 'B');
+  assert.equal(kabaddi.kabaddi.firstHalfStartingRaid, 'A');
 });

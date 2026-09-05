@@ -45,9 +45,12 @@ test('release version is aligned everywhere', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
   const prep = await readFile(new URL('../scripts/prepare-native.mjs', import.meta.url), 'utf8');
-  assert.equal(version, '0.5.1');
+  assert.match(version, /^\d+\.\d+\.\d+$/);
   assert.equal(pkg.version, version);
-  assert.match(gradle, /versionCode 501/);
-  assert.match(gradle, /versionName "0\.5\.1"/);
+  const [major, minor, patch] = version.split('.').map(Number);
+  const versionCode = major * 10000 + minor * 100 + patch;
+  const escapedVersion = version.replaceAll('.', '\\.');
+  assert.match(gradle, new RegExp(`versionCode ${versionCode}`));
+  assert.match(gradle, new RegExp(`versionName "${escapedVersion}"`));
   assert.match(prep, /const version =/);
 });
