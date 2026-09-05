@@ -1,3 +1,5 @@
+import './share-gold.js';
+
 const STORAGE_KEY = 'scorer-state-v2';
 
 function readState() {
