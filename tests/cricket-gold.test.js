@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createInitialState, cricketAction } from '../sports.js';
+import { createInitialState, cricketAction, setCricketRole } from '../sports.js';
 import { createTeamProfile } from '../journal.js';
 import {
   addRosterPlayer, cleanRosterEntries, cricketGoldScorecardMarkup,
@@ -124,7 +124,18 @@ test('gold scorecard separates yet-to-bat and derives familiar bowling columns',
   assert.match(html,/wd 1, nb 1/);
 });
 
-test('cricket gold layer is wired into syntax, offline and native packaging paths', async () => {
+test('completed maiden is counted once when the next over begins', () => {
+  let state = cricketFixture();
+  for (let i = 0; i < 6; i += 1) state = cricketAction(state,'0');
+  assert.equal(state.cricket.needsBowler, true);
+  state = setCricketRole(state,'bowler','Naseem');
+  state = cricketAction(state,'1');
+  const html = cricketGoldScorecardMarkup(state);
+  assert.match(html,/<strong>Shaheen<\/strong><\/td><td>1\.0<\/td><td>1<\/td><td>0<\/td><td>0<\/td>/);
+  assert.doesNotMatch(html,/<strong>Shaheen<\/strong><\/td><td>1\.0<\/td><td>2<\/td>/);
+});
+
+test('cricket gold layer is wired into syntax, offline, live refresh and native packaging paths', async () => {
   const [theme, worker, browser, pkg, prepare] = await Promise.all([
     readFile(new URL('../theme.js', import.meta.url), 'utf8'),
     readFile(new URL('../sw.js', import.meta.url), 'utf8'),
@@ -138,6 +149,8 @@ test('cricket gold layer is wired into syntax, offline and native packaging path
   assert.match(browser,/data-manage-roster/);
   assert.match(browser,/Share \/ WhatsApp/);
   assert.match(browser,/cricketGoldScorecardMarkup/);
+  assert.match(browser,/MutationObserver/);
+  assert.match(browser,/data-cricket-gold-scorecard/);
   assert.match(pkg,/node --check cricket-gold-core\.js/);
   assert.match(pkg,/node --check cricket-gold\.js/);
   assert.match(prepare,/allowed = new Set\(\['\.html', '\.js'/);
