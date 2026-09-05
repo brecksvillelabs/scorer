@@ -213,6 +213,13 @@ function refreshCricketFullScorecard() {
   if (sheetShare) sheetShare.textContent = 'Share / WhatsApp';
 }
 
+function openCricketFullScorecard() {
+  refreshCricketFullScorecard();
+  const modal = $('fullScoreboardModal');
+  modal?.classList.remove('hidden');
+  modal?.setAttribute('aria-hidden','false');
+}
+
 function installScorecardObserver() {
   if (scorecardObserver || typeof MutationObserver === 'undefined') return;
   const host = $('fullScoreboardContent');
@@ -257,13 +264,22 @@ async function copyCricketState(state) {
 }
 
 function installClickHandlers() {
+  // Cricket owns the full-scorecard open path. Intercept before app.js's
+  // generic target listener so the packaged app never flashes or depends on
+  // the legacy Cricket renderer before the Gold card appears.
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('#fullScoreboardBtn');
+    if (!button) return;
+    const state = readState();
+    if (state?.sport !== 'cricket') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openCricketFullScorecard();
+  }, true);
+
   document.addEventListener('click', event => {
     const manage = event.target.closest?.('[data-manage-roster]');
     if (manage) openRosterManager(manage.dataset.manageRoster);
-  });
-
-  document.addEventListener('click', event => {
-    if (event.target.closest?.('#fullScoreboardBtn')) setTimeout(refreshCricketFullScorecard, 0);
   });
 
   document.addEventListener('click', event => {
