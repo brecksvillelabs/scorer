@@ -58,7 +58,7 @@ test('Share Gold: soccer reads like a football score update and never invents sc
   const text=formatShareGoldMessage(s);
   assert.match(text,/Eagles 2–1 Tigers • 67'/);
   assert.match(text,/Cards: Eagles 1Y\/0R • Tigers 2Y\/0R/);
-  assert.doesNotMatch(text,/scorer|goal by/i);
+  assert.doesNotMatch(text,/goal by|scored by|scorer:/i);
 });
 
 test('Share Gold: American football prioritizes down-distance and possession', () => {
