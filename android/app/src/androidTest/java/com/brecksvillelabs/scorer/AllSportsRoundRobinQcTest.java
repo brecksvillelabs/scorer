@@ -3,22 +3,18 @@ package com.brecksvillelabs.scorer;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
-import android.util.Base64;
 import android.webkit.WebView;
+import android.graphics.Bitmap;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileWriter;
-import java.io.InputStreamReader;
-import java.nio.file.Files;
+import java.io.FileOutputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -45,7 +41,6 @@ public class AllSportsRoundRobinQcTest {
         File artifactDir = new File(external, "scorer-qc");
         assertTrue(artifactDir.mkdirs() || artifactDir.isDirectory());
         File reportFile = new File(artifactDir, "all-sports-round-robin-report.csv");
-        runShell("rm -rf /sdcard/scorer-qc && mkdir -p /sdcard/scorer-qc");
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class);
              BufferedWriter report = new BufferedWriter(new FileWriter(reportFile, false))) {
@@ -142,10 +137,11 @@ public class AllSportsRoundRobinQcTest {
                 "ten QC sport personas"
             );
             assertTrue("Expected 60 game screenshots", screenshotIndex == 61);
-            String durableCount = runShell("find /sdcard/scorer-qc -maxdepth 1 -name '*.png' | wc -l").trim();
-            assertTrue("Expected 60 durable game screenshots but found " + durableCount, "60".equals(durableCount));
+            File[] screenshots = artifactDir.listFiles((dir, name) -> name.endsWith(".png"));
+            int screenshotCount = screenshots == null ? 0 : screenshots.length;
+            assertTrue("Expected 60 game screenshots but found " + screenshotCount, screenshotCount == 60);
             report.flush();
-            copyReportToDurableStorage(reportFile);
+            assertTrue("QC CSV manifest was not written", reportFile.isFile() && reportFile.length() > 0);
         }
     }
 
@@ -321,32 +317,17 @@ public class AllSportsRoundRobinQcTest {
     }
 
     private void captureScreenshot(File file) throws Exception {
-        String durablePath = "/sdcard/scorer-qc/" + file.getName();
-        runShell("screencap -p " + durablePath);
-        assertTrue("Durable screenshot was not written " + file.getName(),
-            "true".equals(runShell("if [ -s " + durablePath + " ]; then echo true; else echo false; fi").trim()));
-    }
-
-    private void copyReportToDurableStorage(File reportFile) throws Exception {
-        byte[] bytes = Files.readAllBytes(reportFile.toPath());
-        String base64 = Base64.encodeToString(bytes, Base64.NO_WRAP);
-        String durablePath = "/sdcard/scorer-qc/all-sports-round-robin-report.csv";
-        runShell("echo '" + base64 + "' | base64 -d > " + durablePath);
-        assertTrue("QC CSV manifest was not copied to durable storage",
-            "true".equals(runShell("if [ -s " + durablePath + " ]; then echo true; else echo false; fi").trim()));
-    }
-
-    private String runShell(String command) throws Exception {
-        ParcelFileDescriptor descriptor = InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand(command);
-        StringBuilder output = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ParcelFileDescriptor.AutoCloseInputStream(descriptor)))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (output.length() > 0) output.append('\n');
-                output.append(line);
-            }
+        Bitmap bitmap = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+        assertNotNull("Android QC screenshot capture returned null", bitmap);
+        boolean compressed;
+        try (FileOutputStream out = new FileOutputStream(file, false)) {
+            compressed = bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.flush();
+        } finally {
+            bitmap.recycle();
         }
-        return output.toString();
+        assertTrue("Screenshot PNG compression failed for " + file.getName(), compressed);
+        assertTrue("Screenshot was not written " + file.getName(), file.isFile() && file.length() > 0);
     }
 
     private String teamName(String sport, String label) {
