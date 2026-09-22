@@ -54,8 +54,8 @@ jobs:
             ./android/gradlew -p android connectedDebugAndroidTest --stacktrace
             status=$?
             mkdir -p android/qc-artifacts/debug
-            adb shell ls /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc || true
-            adb pull /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc android/qc-artifacts/debug/ || true
+            adb shell ls /sdcard/Download/scorer-qc || true
+            adb pull /sdcard/Download/scorer-qc android/qc-artifacts/debug/ || true
             exit $status
 
       - name: Upload Android notification test reports
@@ -148,8 +148,8 @@ jobs:
             ./android/gradlew -p android -PscorerTestBuildType=release connectedReleaseAndroidTest --stacktrace
             status=$?
             mkdir -p android/qc-artifacts/release
-            adb shell ls /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc || true
-            adb pull /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc android/qc-artifacts/release/ || true
+            adb shell ls /sdcard/Download/scorer-qc || true
+            adb pull /sdcard/Download/scorer-qc android/qc-artifacts/release/ || true
             exit $status
 
       - name: Upload Android 16 release test reports
