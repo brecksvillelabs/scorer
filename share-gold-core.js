@@ -32,7 +32,10 @@ function clockText(state) {
 
 function soccerMinute(state) {
   const seconds = Math.max(0,num(state?.clock?.seconds));
-  return `${Math.max(0,Math.ceil(seconds / 60))}'`;
+  const period = Math.max(1,num(state?.period) || 1);
+  const regulationPeriodSeconds = Math.max(0,num(state?.clock?.periodSeconds) || num(state?.clock?.targetSeconds));
+  const completedPeriodMinutes = Math.round((regulationPeriodSeconds * (period - 1)) / 60);
+  return `${Math.max(0,completedPeriodMinutes + Math.ceil(seconds / 60))}'`;
 }
 
 function ordinal(value) {
