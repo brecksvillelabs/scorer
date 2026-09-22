@@ -54,7 +54,7 @@ test('Share Gold: basketball uses quarter clock, ball and compact team context',
 
 test('Share Gold: soccer reads like a football score update and never invents scorers', () => {
   const s=createInitialState(named('soccer'));
-  s.teamA.score=2; s.teamB.score=1; s.teamA.yellows=1; s.teamB.yellows=2; s.clock.seconds=4020;
+  s.teamA.score=2; s.teamB.score=1; s.teamA.yellows=1; s.teamB.yellows=2; s.clock.seconds=4020; s.clock.running=true;
   const text=formatShareGoldMessage(s);
   assert.match(text,/Eagles 2–1 Tigers • 67'/);
   assert.match(text,/Cards: Eagles 1Y\/0R • Tigers 2Y\/0R/);
