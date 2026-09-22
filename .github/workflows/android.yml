@@ -49,7 +49,14 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: ./android/gradlew -p android connectedDebugAndroidTest --stacktrace
+          script: |
+            set +e
+            ./android/gradlew -p android connectedDebugAndroidTest --stacktrace
+            status=$?
+            mkdir -p android/qc-artifacts/debug
+            adb shell ls /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc || true
+            adb pull /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc android/qc-artifacts/debug/ || true
+            exit $status
 
       - name: Upload Android notification test reports
         if: always()
@@ -59,6 +66,7 @@ jobs:
           path: |
             android/app/build/reports/androidTests/connected/
             android/app/build/outputs/androidTest-results/connected/
+            android/qc-artifacts/debug/
           if-no-files-found: warn
 
       - name: Upload debug APK
@@ -135,7 +143,14 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: ./android/gradlew -p android -PscorerTestBuildType=release connectedReleaseAndroidTest --stacktrace
+          script: |
+            set +e
+            ./android/gradlew -p android -PscorerTestBuildType=release connectedReleaseAndroidTest --stacktrace
+            status=$?
+            mkdir -p android/qc-artifacts/release
+            adb shell ls /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc || true
+            adb pull /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc android/qc-artifacts/release/ || true
+            exit $status
 
       - name: Upload Android 16 release test reports
         if: always()
@@ -145,6 +160,7 @@ jobs:
           path: |
             android/app/build/reports/androidTests/connected/
             android/app/build/outputs/androidTest-results/connected/
+            android/qc-artifacts/release/
           if-no-files-found: warn
 
       - name: Upload CI-only release bundle
