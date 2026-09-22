@@ -45,7 +45,7 @@ public class AllSportsRoundRobinQcTest {
         File artifactDir = new File(external, "scorer-qc");
         assertTrue(artifactDir.mkdirs() || artifactDir.isDirectory());
         File reportFile = new File(artifactDir, "all-sports-round-robin-report.csv");
-        runShell("rm -rf /data/local/tmp/scorer-qc && mkdir -p /data/local/tmp/scorer-qc");
+        runShell("rm -rf /sdcard/scorer-qc && mkdir -p /sdcard/scorer-qc");
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class);
              BufferedWriter report = new BufferedWriter(new FileWriter(reportFile, false))) {
@@ -142,7 +142,7 @@ public class AllSportsRoundRobinQcTest {
                 "ten QC sport personas"
             );
             assertTrue("Expected 60 game screenshots", screenshotIndex == 61);
-            String durableCount = runShell("find /data/local/tmp/scorer-qc -maxdepth 1 -name '*.png' | wc -l").trim();
+            String durableCount = runShell("find /sdcard/scorer-qc -maxdepth 1 -name '*.png' | wc -l").trim();
             assertTrue("Expected 60 durable game screenshots but found " + durableCount, "60".equals(durableCount));
             report.flush();
             copyReportToDurableStorage(reportFile);
@@ -321,7 +321,7 @@ public class AllSportsRoundRobinQcTest {
     }
 
     private void captureScreenshot(File file) throws Exception {
-        String durablePath = "/data/local/tmp/scorer-qc/" + file.getName();
+        String durablePath = "/sdcard/scorer-qc/" + file.getName();
         runShell("screencap -p " + durablePath);
         assertTrue("Durable screenshot was not written " + file.getName(),
             "true".equals(runShell("if [ -s " + durablePath + " ]; then echo true; else echo false; fi").trim()));
@@ -330,7 +330,7 @@ public class AllSportsRoundRobinQcTest {
     private void copyReportToDurableStorage(File reportFile) throws Exception {
         byte[] bytes = Files.readAllBytes(reportFile.toPath());
         String base64 = Base64.encodeToString(bytes, Base64.NO_WRAP);
-        String durablePath = "/data/local/tmp/scorer-qc/all-sports-round-robin-report.csv";
+        String durablePath = "/sdcard/scorer-qc/all-sports-round-robin-report.csv";
         runShell("echo '" + base64 + "' | base64 -d > " + durablePath);
         assertTrue("QC CSV manifest was not copied to durable storage",
             "true".equals(runShell("if [ -s " + durablePath + " ]; then echo true; else echo false; fi").trim()));
