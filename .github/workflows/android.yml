@@ -56,6 +56,8 @@ jobs:
             mkdir -p android/qc-artifacts/debug
             adb shell ls /data/local/tmp/scorer-qc || true
             adb pull /data/local/tmp/scorer-qc android/qc-artifacts/debug/ || true
+            adb shell ls /sdcard/scorer-qc || true
+            adb pull /sdcard/scorer-qc android/qc-artifacts/debug/ || true
             exit $status
 
       - name: Upload Android notification test reports
@@ -150,6 +152,8 @@ jobs:
             mkdir -p android/qc-artifacts/release
             adb shell ls /data/local/tmp/scorer-qc || true
             adb pull /data/local/tmp/scorer-qc android/qc-artifacts/release/ || true
+            adb shell ls /sdcard/scorer-qc || true
+            adb pull /sdcard/scorer-qc android/qc-artifacts/release/ || true
             exit $status
 
       - name: Upload Android 16 release test reports
