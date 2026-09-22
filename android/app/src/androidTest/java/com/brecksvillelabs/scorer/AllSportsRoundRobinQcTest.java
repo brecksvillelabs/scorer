@@ -3,9 +3,9 @@ package com.brecksvillelabs.scorer;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import android.graphics.Bitmap;
 import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
+import android.util.Base64;
 import android.webkit.WebView;
 
 import androidx.test.core.app.ActivityScenario;
@@ -16,9 +16,9 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -145,9 +145,7 @@ public class AllSportsRoundRobinQcTest {
             String durableCount = runShell("find /data/local/tmp/scorer-qc -maxdepth 1 -name '*.png' | wc -l").trim();
             assertTrue("Expected 60 durable game screenshots but found " + durableCount, "60".equals(durableCount));
             report.flush();
-            runShell("cp " + reportFile.getAbsolutePath() + " /data/local/tmp/scorer-qc/all-sports-round-robin-report.csv");
-            assertTrue("QC CSV manifest was not copied to durable storage",
-                "true".equals(runShell("if [ -s /data/local/tmp/scorer-qc/all-sports-round-robin-report.csv ]; then echo true; else echo false; fi").trim()));
+            copyReportToDurableStorage(reportFile);
         }
     }
 
@@ -221,6 +219,8 @@ public class AllSportsRoundRobinQcTest {
 
         evaluate(webView,
             "(() => {" +
+            " const emptyA=new DataTransfer(); document.getElementById('inputLogoA').files=emptyA.files;" +
+            " const emptyB=new DataTransfer(); document.getElementById('inputLogoB').files=emptyB.files;" +
             " const f=JSON.parse(localStorage.getItem('scorer-favorite-teams-v1')||'[]');" +
             " const load=(side,name)=>{ const p=f.find(x=>x.sport===" + q(sport) + " && x.name===name);" +
             " if(!p) return false; const sel=document.getElementById('favoriteSelect'+side); sel.value=p.id;" +
@@ -236,12 +236,14 @@ public class AllSportsRoundRobinQcTest {
             " return document.getElementById('inputNameA').value===" + q(leftName) +
             " && document.getElementById('inputNameB').value===" + q(rightName) +
             " && a===" + rosterCount + " && b===" + rosterCount +
+            " && document.getElementById('inputLogoA').files.length===1" +
+            " && document.getElementById('inputLogoB').files.length===1" +
             " && Boolean(document.querySelector('#logoPreviewA img') && document.querySelector('#logoPreviewB img'));" +
             " })()",
-            10000,
-            sport + " saved teams loaded into setup"
+            12000,
+            sport + " saved teams and logo files loaded into setup"
         );
-        SystemClock.sleep(350);
+        SystemClock.sleep(500);
 
         evaluate(webView, "document.getElementById('startGameBtn').click(); 'started'");
         waitForJsTrue(webView,
@@ -319,18 +321,18 @@ public class AllSportsRoundRobinQcTest {
     }
 
     private void captureScreenshot(File file) throws Exception {
-        Bitmap bitmap = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
-        assertNotNull(bitmap);
-        try (FileOutputStream out = new FileOutputStream(file)) {
-            assertTrue("Could not encode screenshot " + file.getName(), bitmap.compress(Bitmap.CompressFormat.PNG, 100, out));
-            out.flush();
-        } finally {
-            bitmap.recycle();
-        }
-        assertTrue("Screenshot was not written " + file.getName(), file.isFile() && file.length() > 0);
         String durablePath = "/data/local/tmp/scorer-qc/" + file.getName();
-        runShell("cp " + file.getAbsolutePath() + " " + durablePath);
-        assertTrue("Durable screenshot copy was not written " + file.getName(),
+        runShell("screencap -p " + durablePath);
+        assertTrue("Durable screenshot was not written " + file.getName(),
+            "true".equals(runShell("if [ -s " + durablePath + " ]; then echo true; else echo false; fi").trim()));
+    }
+
+    private void copyReportToDurableStorage(File reportFile) throws Exception {
+        byte[] bytes = Files.readAllBytes(reportFile.toPath());
+        String base64 = Base64.encodeToString(bytes, Base64.NO_WRAP);
+        String durablePath = "/data/local/tmp/scorer-qc/all-sports-round-robin-report.csv";
+        runShell("echo '" + base64 + "' | base64 -d > " + durablePath);
+        assertTrue("QC CSV manifest was not copied to durable storage",
             "true".equals(runShell("if [ -s " + durablePath + " ]; then echo true; else echo false; fi").trim()));
     }
 
