@@ -4,16 +4,22 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.graphics.Bitmap;
-import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
 import android.webkit.WebView;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Context;
+import android.net.Uri;
+import android.os.Environment;
+import android.provider.MediaStore;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -262,36 +268,66 @@ abstract class RoundRobinQcSupport {
         publishArtifact(file, file.getParentFile().getName());
     }
 
-    protected void resetPublishedArtifactDirectory(String subdir) throws Exception {
-        String durableDir = "/sdcard/Download/scorer-qc/" + subdir;
-        runShell("rm -rf " + durableDir + " && mkdir -p " + durableDir);
-        assertTrue("Could not create durable QC artifact directory " + durableDir,
-            "true".equals(runShell("if [ -d " + durableDir + " ]; then echo true; else echo false; fi").trim()));
+    protected void resetPublishedArtifactDirectory(String subdir) {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        ContentResolver resolver = context.getContentResolver();
+        Uri collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+        String relativePath = qcRelativePath(subdir);
+        resolver.delete(
+            collection,
+            MediaStore.MediaColumns.RELATIVE_PATH + "=?",
+            new String[] { relativePath }
+        );
     }
 
     protected void publishArtifact(File file, String subdir) throws Exception {
-        String durableDir = "/sdcard/Download/scorer-qc/" + subdir;
-        String durablePath = durableDir + "/" + file.getName();
-        runShell("mkdir -p " + durableDir + " && cp " + shellQuote(file.getAbsolutePath()) + " " + shellQuote(durablePath));
-        assertTrue("Durable QC artifact was not published " + file.getName(),
-            "true".equals(runShell("if [ -s " + shellQuote(durablePath) + " ]; then echo true; else echo false; fi").trim()));
-    }
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        ContentResolver resolver = context.getContentResolver();
+        Uri collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+        String relativePath = qcRelativePath(subdir);
 
-    private String shellQuote(String value) {
-        return "'" + value.replace("'", "'\\''") + "'";
-    }
+        resolver.delete(
+            collection,
+            MediaStore.MediaColumns.DISPLAY_NAME + "=? AND " + MediaStore.MediaColumns.RELATIVE_PATH + "=?",
+            new String[] { file.getName(), relativePath }
+        );
 
-    private String runShell(String command) throws Exception {
-        ParcelFileDescriptor descriptor = InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand(command);
-        StringBuilder output = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ParcelFileDescriptor.AutoCloseInputStream(descriptor)))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (output.length() > 0) output.append('\n');
-                output.append(line);
-            }
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, file.getName());
+        values.put(MediaStore.MediaColumns.MIME_TYPE,
+            file.getName().toLowerCase().endsWith(".png") ? "image/png" : "text/csv");
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath);
+        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+
+        Uri uri = resolver.insert(collection, values);
+        assertNotNull("Could not create shared QC artifact " + file.getName(), uri);
+
+        try (InputStream in = new FileInputStream(file);
+             OutputStream out = resolver.openOutputStream(uri, "w")) {
+            assertNotNull("Could not open shared QC artifact " + file.getName(), out);
+            byte[] buffer = new byte[16 * 1024];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+            out.flush();
         }
-        return output.toString();
+
+        ContentValues ready = new ContentValues();
+        ready.put(MediaStore.MediaColumns.IS_PENDING, 0);
+        resolver.update(uri, ready, null, null);
+
+        try (android.database.Cursor cursor = resolver.query(
+                uri,
+                new String[] { MediaStore.MediaColumns.SIZE },
+                null,
+                null,
+                null)) {
+            assertTrue("Shared QC artifact query failed " + file.getName(), cursor != null && cursor.moveToFirst());
+            assertTrue("Shared QC artifact was empty " + file.getName(), cursor.getLong(0) > 0);
+        }
+    }
+
+    private String qcRelativePath(String subdir) {
+        return Environment.DIRECTORY_DOWNLOADS + "/scorer-qc/" + subdir + "/";
     }
 
     protected String logoSvg(TeamFixture team) {
