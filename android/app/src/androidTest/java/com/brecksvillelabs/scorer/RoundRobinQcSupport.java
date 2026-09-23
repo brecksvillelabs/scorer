@@ -225,6 +225,24 @@ abstract class RoundRobinQcSupport {
             10000,
             sport + " persisted game start"
         );
+        waitForJsTrue(webView,
+            "(() => {" +
+            " const modal=document.getElementById('setupModal');" +
+            " const surface=document.getElementById('gameSurface');" +
+            " const text=surface?.textContent||'';" +
+            " const logos=surface?.querySelectorAll('.team-logo img').length||0;" +
+            " return Boolean(modal && modal.hidden" +
+            " && modal.classList.contains('hidden')" +
+            " && modal.getAttribute('aria-hidden')==='true'" +
+            " && getComputedStyle(modal).display==='none'" +
+            " && surface && getComputedStyle(surface).display!=='none'" +
+            " && text.includes(" + q(left.name) + ")" +
+            " && text.includes(" + q(right.name) + ")" +
+            " && logos>=2); })()",
+            5000,
+            sport + " setup dismissed and live scoreboard visible"
+        );
+        SystemClock.sleep(200);
     }
 
     protected void openAndValidateFullScoreboard(WebView webView, String sport, TeamFixture left, TeamFixture right) throws Exception {
