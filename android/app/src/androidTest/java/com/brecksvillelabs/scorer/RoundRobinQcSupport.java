@@ -4,6 +4,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.graphics.Bitmap;
+import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
 import android.webkit.WebView;
 
@@ -11,6 +12,8 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -256,6 +259,39 @@ abstract class RoundRobinQcSupport {
         }
         assertTrue("Screenshot PNG compression failed for " + file.getName(), compressed);
         assertTrue("Screenshot was not written " + file.getName(), file.isFile() && file.length() > 0);
+        publishArtifact(file, file.getParentFile().getName());
+    }
+
+    protected void resetPublishedArtifactDirectory(String subdir) throws Exception {
+        String durableDir = "/sdcard/Download/scorer-qc/" + subdir;
+        runShell("rm -rf " + durableDir + " && mkdir -p " + durableDir);
+        assertTrue("Could not create durable QC artifact directory " + durableDir,
+            "true".equals(runShell("if [ -d " + durableDir + " ]; then echo true; else echo false; fi").trim()));
+    }
+
+    protected void publishArtifact(File file, String subdir) throws Exception {
+        String durableDir = "/sdcard/Download/scorer-qc/" + subdir;
+        String durablePath = durableDir + "/" + file.getName();
+        runShell("mkdir -p " + durableDir + " && cp " + shellQuote(file.getAbsolutePath()) + " " + shellQuote(durablePath));
+        assertTrue("Durable QC artifact was not published " + file.getName(),
+            "true".equals(runShell("if [ -s " + shellQuote(durablePath) + " ]; then echo true; else echo false; fi").trim()));
+    }
+
+    private String shellQuote(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
+    }
+
+    private String runShell(String command) throws Exception {
+        ParcelFileDescriptor descriptor = InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand(command);
+        StringBuilder output = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ParcelFileDescriptor.AutoCloseInputStream(descriptor)))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (output.length() > 0) output.append('\n');
+                output.append(line);
+            }
+        }
+        return output.toString();
     }
 
     protected String logoSvg(TeamFixture team) {
