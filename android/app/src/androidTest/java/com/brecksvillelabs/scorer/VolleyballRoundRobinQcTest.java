@@ -88,6 +88,7 @@ public class VolleyballRoundRobinQcTest extends RoundRobinQcSupport {
                 String screenshots;
 
                 loadSavedTeamsIntoSetup(webView, SPORT, left, right);
+                setReferenceMatchFormat(webView);
 
                 if (game == 0) {
                     captureScreenshot(new File(artifactDir, "01-volleyball-team-setup.png"));
@@ -95,6 +96,7 @@ public class VolleyballRoundRobinQcTest extends RoundRobinQcSupport {
                 }
 
                 startMatch(webView, SPORT, left, right);
+                waitForReferenceMatchFormat(webView);
 
                 if (game == 0) {
                     scorePoints(webView, "B", 5);
@@ -151,6 +153,36 @@ public class VolleyballRoundRobinQcTest extends RoundRobinQcSupport {
             report.flush();
             assertTrue("Volleyball QC CSV report was not written", reportFile.isFile() && reportFile.length() > 0);
         }
+    }
+
+
+    private void setReferenceMatchFormat(WebView webView) throws Exception {
+        evaluate(webView,
+            "(() => {" +
+            " document.getElementById('settingBestOf').value='5';" +
+            " document.getElementById('settingSetTo').value='25';" +
+            " document.getElementById('settingDecidingSetTo').value='15';" +
+            " document.getElementById('settingWinBy').value='2';" +
+            " return true; })()"
+        );
+        waitForJsTrue(webView,
+            "document.getElementById('settingBestOf').value==='5'" +
+            " && document.getElementById('settingSetTo').value==='25'" +
+            " && document.getElementById('settingDecidingSetTo').value==='15'" +
+            " && document.getElementById('settingWinBy').value==='2'",
+            3000,
+            "Volleyball reference match format in setup"
+        );
+    }
+
+    private void waitForReferenceMatchFormat(WebView webView) throws Exception {
+        waitForJsTrue(webView,
+            "(() => { const s=JSON.parse(localStorage.getItem('scorer-state-v2')||'null');" +
+            " return Boolean(s && s.volleyball?.bestOf===5 && s.volleyball?.setTo===25" +
+            " && s.volleyball?.decidingSetTo===15 && s.volleyball?.winBy===2); })()",
+            5000,
+            "Volleyball best-of-5 reference match format"
+        );
     }
 
     private void finishCurrentSet(WebView webView, int loserTarget, int winnerTarget,
