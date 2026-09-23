@@ -14,3 +14,17 @@ jobs:
           node-version: 22
       - run: npm ci --no-audit --no-fund
       - run: npm run check
+
+      - name: Package Volleyball QC source
+        if: always()
+        run: |
+          zip -qr scorer-volleyball-qc-source.zip . \
+            -x ".git/*" "node_modules/*" "android/.gradle/*" "android/app/build/*" "android/build/*" "android/qc-output/*"
+      - name: Upload Volleyball QC source bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorer-volleyball-qc-source
+          path: scorer-volleyball-qc-source.zip
+          if-no-files-found: error
+          retention-days: 14

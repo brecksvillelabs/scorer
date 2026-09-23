@@ -141,8 +141,20 @@ function renderSportSettings() {
   });
 }
 
-function openSetup(editing = false) { editingExisting = editing; el.startGameBtn.textContent = editing ? 'Apply changes' : 'Start scoreboard'; el.setupModal.classList.remove('hidden'); el.setupModal.setAttribute('aria-hidden','false'); }
-function closeSetup() { el.setupModal.classList.add('hidden'); el.setupModal.setAttribute('aria-hidden','true'); }
+function openSetup(editing = false) {
+  editingExisting = editing;
+  el.startGameBtn.textContent = editing ? 'Apply changes' : 'Start scoreboard';
+  el.setupModal.hidden = false;
+  el.setupModal.classList.remove('hidden');
+  el.setupModal.removeAttribute('inert');
+  el.setupModal.setAttribute('aria-hidden','false');
+}
+function closeSetup() {
+  el.setupModal.classList.add('hidden');
+  el.setupModal.hidden = true;
+  el.setupModal.setAttribute('inert','');
+  el.setupModal.setAttribute('aria-hidden','true');
+}
 
 function hydrateSetup() {
   selectedSport = state.sport; updateSportChoice();
@@ -184,7 +196,8 @@ function startFromSetup() {
     kabaddiRaidSeconds:Number($('settingKabaddiRaidSeconds')?.value || 30), kabaddiFirstRaid:$('settingKabaddiFirstRaid')?.value || 'A',
     baseballInnings:Number($('settingBaseballInnings')?.value || 9), baseballFirstBat:$('settingBaseballFirstBat')?.value || 'B'
   };
-  if (editingExisting && selectedSport === state.sport) {
+  try {
+    if (editingExisting && selectedSport === state.sport) {
     const n = clone(state); Object.assign(n.teamA, opts.teamA); Object.assign(n.teamB, opts.teamB);
     if (selectedSport === 'volleyball') Object.assign(n.volleyball,{bestOf:opts.bestOf,setTo:opts.setTo,decidingSetTo:opts.decidingSetTo,winBy:opts.winBy});
     if (['basketball','soccer','football','lacrosse','kabaddi'].includes(selectedSport)) { n.clock.periodSeconds = opts.periodMinutes * 60; n.clock.targetSeconds = opts.periodMinutes * 60; }
@@ -205,7 +218,10 @@ function startFromSetup() {
     if (selectedSport === 'badminton') { n.badminton.bestOf=opts.badmintonBestOf; n.badminton.gameTo=opts.badmintonGameTo; }
     pushCommit(n,'Match settings updated');
   } else { history=[]; state=createStateFor(opts); save(); render(); toast(`${SPORTS[selectedSport].name} ready`); }
-  editingExisting=false; closeSetup();
+  } finally {
+    editingExisting=false;
+    closeSetup();
+  }
 }
 
 function render() {

@@ -99,22 +99,22 @@ public class CricketGoldQcTest {
                 "Cricket Gold scorecard layer"
             );
             waitForJsTrue(webView,
-                "(() => { const text=document.getElementById('fullScoreboardContent')?.innerText||''; return text.includes('India') && text.includes('Pakistan'); })()",
+                "(() => { const text=document.getElementById('fullScoreboardContent')?.textContent||''; return text.includes('India') && text.includes('Pakistan'); })()",
                 8000,
                 "Cricket Gold innings headings"
             );
             waitForJsTrue(webView,
-                "(() => { const text=document.getElementById('fullScoreboardContent')?.innerText||''; return text.includes('Yet to bat'); })()",
+                "(() => { const text=document.getElementById('fullScoreboardContent')?.textContent||''; return text.includes('Yet to bat'); })()",
                 8000,
                 "Cricket Gold yet-to-bat section"
             );
             waitForJsTrue(webView,
-                "(() => { const text=document.getElementById('fullScoreboardContent')?.innerText||''; return text.includes('Fall of wickets'); })()",
+                "(() => { const text=document.getElementById('fullScoreboardContent')?.textContent||''; return text.includes('Fall of wickets'); })()",
                 8000,
                 "Cricket Gold fall-of-wickets section"
             );
             waitForJsTrue(webView,
-                "(() => { const text=document.getElementById('fullScoreboardContent')?.innerText||''; return text.includes('Bowling') && text.includes('WD') && text.includes('NB'); })()",
+                "(() => { const text=document.getElementById('fullScoreboardContent')?.textContent||''; return text.includes('Bowling') && text.includes('WD') && text.includes('NB'); })()",
                 8000,
                 "Cricket Gold bowling table"
             );
