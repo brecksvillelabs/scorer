@@ -52,6 +52,7 @@ public class VolleyballRoundRobinQcTest extends RoundRobinQcSupport {
         assertNotNull(external);
         File artifactDir = new File(external, "scorer-qc/volleyball-reference");
         resetArtifactDirectory(artifactDir);
+        resetPublishedArtifactDirectory("volleyball-reference");
         File reportFile = new File(artifactDir, "volleyball-qc-report.csv");
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class);
@@ -152,6 +153,7 @@ public class VolleyballRoundRobinQcTest extends RoundRobinQcSupport {
             assertTrue("Internal Volleyball screenshot counter mismatch", screenshotCount == 8);
             report.flush();
             assertTrue("Volleyball QC CSV report was not written", reportFile.isFile() && reportFile.length() > 0);
+            publishArtifact(reportFile, "volleyball-reference");
         }
     }
 
