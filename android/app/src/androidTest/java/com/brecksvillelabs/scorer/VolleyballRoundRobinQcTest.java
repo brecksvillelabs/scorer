@@ -100,10 +100,13 @@ public class VolleyballRoundRobinQcTest extends RoundRobinQcSupport {
                 waitForReferenceMatchFormat(webView);
 
                 if (game == 0) {
+                    captureScreenshot(new File(artifactDir, "02-volleyball-live-start.png"));
+                    screenshotCount++;
+
                     scorePoints(webView, "B", 5);
                     scorePoints(webView, "A", 7);
                     waitForScore(webView, 7, 5);
-                    captureScreenshot(new File(artifactDir, "02-volleyball-live-7-5.png"));
+                    captureScreenshot(new File(artifactDir, "03-volleyball-live-7-5.png"));
                     screenshotCount++;
 
                     finishCurrentSet(webView, 18, 25, 5, 7, 1);
@@ -119,12 +122,12 @@ public class VolleyballRoundRobinQcTest extends RoundRobinQcSupport {
                 openAndValidateFullScoreboard(webView, SPORT, left, right);
 
                 if (game == 0) {
-                    captureScreenshot(new File(artifactDir, "03-volleyball-final-scoreboard.png"));
+                    captureScreenshot(new File(artifactDir, "04-volleyball-final-scoreboard.png"));
                     screenshotCount++;
-                    screenshots = "01-volleyball-team-setup.png;02-volleyball-live-7-5.png;03-volleyball-final-scoreboard.png";
+                    screenshots = "01-volleyball-team-setup.png;02-volleyball-live-start.png;03-volleyball-live-7-5.png;04-volleyball-final-scoreboard.png";
                 } else {
                     screenshots = String.format("%02d-volleyball-%s-vs-%s-final.png",
-                        game + 3, slug(left.label), slug(right.label));
+                        game + 4, slug(left.label), slug(right.label));
                 }
 
                 closeFullScoreboard(webView);
@@ -149,8 +152,8 @@ public class VolleyballRoundRobinQcTest extends RoundRobinQcSupport {
 
             File[] screenshots = artifactDir.listFiles((dir, name) -> name.endsWith(".png"));
             int actualScreenshots = screenshots == null ? 0 : screenshots.length;
-            assertTrue("Expected 8 Volleyball QC screenshots but found " + actualScreenshots, actualScreenshots == 8);
-            assertTrue("Internal Volleyball screenshot counter mismatch", screenshotCount == 8);
+            assertTrue("Expected 9 Volleyball QC screenshots but found " + actualScreenshots, actualScreenshots == 9);
+            assertTrue("Internal Volleyball screenshot counter mismatch", screenshotCount == 9);
             report.flush();
             assertTrue("Volleyball QC CSV report was not written", reportFile.isFile() && reportFile.length() > 0);
             publishArtifact(reportFile, "volleyball-reference");
