@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testClass = "com.brecksvillelabs.scorer.VolleyballRoundRobinQcTest"
-$remoteArtifacts = "/sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc/volleyball-reference"
+$remoteArtifacts = "/sdcard/Download/scorer-qc/volleyball-reference"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $outputDir = Join-Path $repoRoot "android\qc-output\$timestamp-volleyball"
 
