@@ -296,8 +296,8 @@ public class BasketballRoundRobinQcTest extends RoundRobinQcSupport {
     private void nextQuarter(WebView webView, int expectedQuarter) throws Exception {
         assertTrue("Could not advance Basketball quarter",
             "true".equals(evaluate(webView,
-                "(() => { const b=document.querySelector('[data-action=period][data-delta="1"]');" +
-                " if(!b)return false; b.click(); return true; })()"
+                "(() => { const b=[...document.querySelectorAll('[data-action=period]')]" +
+                ".find(x=>Number(x.dataset.delta)===1); if(!b)return false; b.click(); return true; })()"
             ))
         );
         waitForJsTrue(webView,
