@@ -123,7 +123,7 @@ export function createInitialState(options = {}) {
       firstServer: options.servingTeam === 'B' ? 'B' : 'A', phase: 'live', setHistory: [], timeouts: { A: 2, B: 2 }, matchWinner: null
     },
     basketball: { possession: 'A', timeouts: { A: 5, B: 5 } },
-    soccer: { stoppage: 0 },
+    soccer: { stoppage: 0, selectedPlayer: { A:'', B:'' } },
     football: { down: 1, distance: 10, possession: 'A', timeouts: { A: 3, B: 3 } },
     tennis: {
       bestOf: Number(options.tennisBestOf || 3), points: { A: 0, B: 0 }, games: { A: 0, B: 0 }, sets: { A: 0, B: 0 },
@@ -246,7 +246,7 @@ export function applySimpleScore(state, side, delta) {
   next.updatedAt = Date.now(); return next;
 }
 
-export function soccerGoal(state, side, delta = 1) {
+export function soccerGoal(state, side, delta = 1, player = '') {
   const next = clone(state);
   if (next.sport !== 'soccer' || next.finished || !['A','B'].includes(side)) return next;
   const key = teamKey(side);
@@ -261,14 +261,15 @@ export function soccerGoal(state, side, delta = 1) {
       score: next[key].score,
       scoreA: next.teamA.score,
       scoreB: next.teamB.score,
-      clockSeconds: next.clock?.seconds
+      clockSeconds: next.clock?.seconds,
+      player: String(player || '').trim() || undefined
     });
   }
   next.updatedAt = Date.now();
   return next;
 }
 
-export function soccerCard(state, side, card, delta = 1) {
+export function soccerCard(state, side, card, delta = 1, player = '') {
   const next = clone(state);
   if (next.sport !== 'soccer' || next.finished || !['A','B'].includes(side)) return next;
   const field = card === 'red' ? 'reds' : card === 'yellow' ? 'yellows' : null;
@@ -285,7 +286,8 @@ export function soccerCard(state, side, card, delta = 1) {
       count: next[key][field],
       scoreA: next.teamA.score,
       scoreB: next.teamB.score,
-      clockSeconds: next.clock?.seconds
+      clockSeconds: next.clock?.seconds,
+      player: String(player || '').trim() || undefined
     });
   }
   next.updatedAt = Date.now();
