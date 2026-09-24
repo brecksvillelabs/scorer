@@ -280,7 +280,8 @@ function soccerTimeline(state) {
       ? correction ? 'Goal corrected' : 'Goal'
       : correction ? `${kind === 'yellow' ? 'Yellow' : 'Red'} corrected` : `${kind === 'yellow' ? 'Yellow card' : 'Red card'}`;
     const icon = kind === 'goal' ? '⚽' : kind === 'yellow' ? '<i class="soccer-event-card yellow"></i>' : '<i class="soccer-event-card red"></i>';
-    return `<div class="soccer-event-row ${correction ? 'correction' : ''}"><time>${minute}'</time><span class="soccer-event-icon">${icon}</span><div><strong>${esc(label)}</strong><small>${esc(name)}</small></div></div>`;
+    const attribution = event.player ? `${esc(event.player)} · ${esc(name)}` : esc(name);
+    return `<div class="soccer-event-row ${correction ? 'correction' : ''}"><time>${minute}'</time><span class="soccer-event-icon">${icon}</span><div><strong>${esc(label)}</strong><small>${attribution}</small></div></div>`;
   }).join('')}</div>`;
 }
 
