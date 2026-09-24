@@ -281,6 +281,14 @@ async function shareCurrentScore(){
 function renderSoccer() {
   const status = state.finished ? 'FINAL' : state.period === 1 ? '1ST HALF' : '2ND HALF';
   const detailed = state.trackingMode === 'advanced';
+  const heroTeam = side => {
+    const t = state[teamKey(side)];
+    const logo = t.logo ? `<img src="${t.logo}" alt="">` : esc((t.name || '?')[0].toUpperCase());
+    return `<div class="soccer-hero-team" data-hero-team="${side}">
+      <div class="soccer-hero-logo">${logo}</div>
+      <strong>${esc(t.name)}</strong>
+    </div>`;
+  };
   const playerSelect = side => {
     if (!detailed) return '';
     const t = state[teamKey(side)];
@@ -292,8 +300,11 @@ function renderSoccer() {
     const t = state[teamKey(side)];
     const logo = t.logo ? `<img src="${t.logo}" alt="">` : esc((t.name || '?')[0].toUpperCase());
     return `<article class="soccer-team-card" style="--team-color:${safeColor(t.color)}">
-      <div class="team-head"><div class="team-logo">${logo}</div><div style="min-width:0"><div class="team-name">${esc(t.name)}</div><div class="team-sub">${t.yellows} yellow · ${t.reds} red</div></div></div>
-      <div class="soccer-score">${t.score}</div>
+      <div class="team-head">
+        <div class="team-logo">${logo}</div>
+        <div style="min-width:0"><div class="team-name">${esc(t.name)}</div><div class="team-sub">${t.yellows} yellow · ${t.reds} red</div></div>
+        <div class="soccer-control-score" aria-label="${esc(t.name)} score">${t.score}</div>
+      </div>
       ${playerSelect(side)}
       <div class="soccer-goal-actions">
         <button class="score-btn primary" style="--team-color:${safeColor(t.color)}" data-action="soccer-goal" data-side="${side}" data-delta="1">Goal +1</button>
@@ -306,9 +317,19 @@ function renderSoccer() {
     </article>`;
   };
   el.gameSurface.innerHTML=`<section class="soccer-board">
-    <header class="soccer-match-head">
-      <div><div class="eyebrow">SOCCER · ${status}</div><strong>${state.finished ? 'Full time' : soccerMinuteText(state)}</strong></div>
-      <div class="soccer-match-clock"><span>Match clock</span><b>${soccerClockText(state)}</b><small>${state.finished ? 'Final' : state.clock.running ? 'Running' : 'Paused'}</small></div>
+    <header class="soccer-score-hero">
+      <div class="soccer-hero-meta">
+        <span class="soccer-hero-status">${status}</span>
+        <strong class="soccer-hero-minute">${state.finished ? 'Full time' : soccerMinuteText(state)}</strong>
+        <div class="soccer-match-clock"><span>Match clock</span><b>${soccerClockText(state)}</b><small>${state.finished ? 'Final' : state.clock.running ? 'Running' : 'Paused'}</small></div>
+      </div>
+      <div class="soccer-hero-matchup">
+        ${heroTeam('A')}
+        <div class="soccer-hero-scoreline" aria-label="${esc(state.teamA.name)} ${state.teamA.score} to ${state.teamB.score} ${esc(state.teamB.name)}">
+          <b data-hero-score="A">${state.teamA.score}</b><span>–</span><b data-hero-score="B">${state.teamB.score}</b>
+        </div>
+        ${heroTeam('B')}
+      </div>
     </header>
     ${detailed ? '<div class="soccer-detail-banner">Detailed mode · choose a player only when you want the event attributed.</div>' : ''}
     <div class="soccer-team-grid">${team('A')}${team('B')}</div>
