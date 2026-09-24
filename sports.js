@@ -302,9 +302,9 @@ export function basketballScore(state, side, points = 1, player = '') {
       scoreB: next.teamB.score,
       clockSeconds: next.clock?.seconds
     });
+    if (applied > 0) next.basketball.shotClockRunning = false;
     if (applied > 1 && next.basketball.shotClockSeconds > 0) {
       next.basketball.shotClock = next.basketball.shotClockSeconds;
-      next.basketball.shotClockRunning = false;
     }
   }
   next.updatedAt = Date.now();
@@ -351,7 +351,8 @@ export function basketballShotClockAction(state, action) {
     next.basketball.shotClock = Math.min(14, next.basketball.shotClockSeconds);
     next.basketball.shotClockRunning = false;
   } else if (action === 'toggle') {
-    next.basketball.shotClockRunning = !next.basketball.shotClockRunning;
+    if (next.basketball.shotClock <= 0) next.basketball.shotClockRunning = false;
+    else next.basketball.shotClockRunning = !next.basketball.shotClockRunning;
   }
   appendCoreEvent(next, 'basketball.shot_clock', {
     action,
