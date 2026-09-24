@@ -259,8 +259,8 @@ public class BasketballRoundRobinQcTest extends RoundRobinQcSupport {
         selectPlayer(webView, side, player);
         assertTrue("Could not add Basketball points",
             "true".equals(evaluate(webView,
-                "(() => { const b=document.querySelector('[data-action=basketball-score][data-side=" + side + "][data-delta=\\\"" + points + "\\"]');" +
-                " if(!b)return false; b.click(); return true; })()"
+                "(() => { const b=[...document.querySelectorAll('[data-action=basketball-score][data-side=" + side + "]')]" +
+                ".find(x=>Number(x.dataset.delta)===" + points + "); if(!b)return false; b.click(); return true; })()"
             ))
         );
     }
