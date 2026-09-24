@@ -50,3 +50,11 @@
   .soccer-team-card{padding:16px}
   .soccer-score{font-size:5.2rem}
 }
+
+
+.soccer-detail-banner{padding:10px 12px;border:1px solid rgba(55,207,198,.22);border-radius:14px;background:rgba(55,207,198,.07);color:#8ff5ef;font-size:.78rem;font-weight:800}
+.soccer-player-select{display:grid;gap:6px}
+.soccer-player-select>span{color:#8fa3b9;font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+.soccer-player-select small{font-size:.65rem;font-weight:750;text-transform:none;letter-spacing:0}
+.soccer-player-select select{min-height:42px;width:100%;border:1px solid var(--line);border-radius:12px;background:#0b1a2a;color:var(--text);padding:0 10px;font-weight:800}
+html[data-theme="light"] .soccer-player-select select{background:#fff}
