@@ -302,12 +302,9 @@ export function basketballScore(state, side, points = 1, player = '') {
       scoreB: next.teamB.score,
       clockSeconds: next.clock?.seconds
     });
-    if (applied > 0) {
-      next.basketball.possession = otherSide(side);
-      if (next.basketball.shotClockSeconds > 0) {
-        next.basketball.shotClock = next.basketball.shotClockSeconds;
-        next.basketball.shotClockRunning = false;
-      }
+    if (applied > 1 && next.basketball.shotClockSeconds > 0) {
+      next.basketball.shotClock = next.basketball.shotClockSeconds;
+      next.basketball.shotClockRunning = false;
     }
   }
   next.updatedAt = Date.now();
@@ -738,7 +735,8 @@ export function getPeriodText(state) {
   if (state.sport === 'volleyball') return `Set ${state.period}`;
   if (state.sport === 'tennis') return `Set ${state.period}`;
   if (state.sport === 'badminton') return `Game ${state.period}`;
-  if (['basketball','football'].includes(state.sport)) return `Q${state.period}`;
+  if (state.sport === 'basketball') return state.period <= 4 ? `Q${state.period}` : `OT${state.period - 4}`;
+  if (state.sport === 'football') return `Q${state.period}`;
   if (state.sport === 'soccer') return state.period === 1 ? '1st Half' : '2nd Half';
   if (state.sport === 'cricket') return `${state.cricket.innings === 1 ? '1st' : '2nd'} Innings`;
   return `Period ${state.period}`;
