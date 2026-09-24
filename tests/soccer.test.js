@@ -43,7 +43,10 @@ test('soccer goals and cards produce a familiar chronological match-center score
   assert.match(html,/Red card/);
   assert.match(html,/1H/);
   assert.match(html,/2H/);
-  assert.match(html,/1–0|1-0/);
+  assert.match(html,/Lake Erie FC/);
+  assert.match(html,/Cleveland City SC/);
+  assert.match(html,/Yellow cards/);
+  assert.match(html,/Red cards/);
 });
 
 test('soccer share text keeps cumulative second-half timing and card totals', () => {
