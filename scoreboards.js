@@ -172,8 +172,8 @@ export function formatShareMessage(state) {
     if (!state.finished && state.volleyball.phase !== 'set_break') lines.push(`${teamName(state, state.volleyball.servingTeam)} serving`);
   } else if (state.sport === 'basketball') {
     lines.push(`${a} ${state.teamA.score}–${state.teamB.score} ${b} • ${currentStatus(state)}`);
-    if (!state.finished && !periodHasEnded(state)) {
-      const shot = state.trackingMode === 'advanced' && state.basketball.shotClockSeconds > 0 ? ` • Shot ${state.basketball.shotClock}` : '';
+    if (state.trackingMode === 'advanced' && !state.finished && !periodHasEnded(state)) {
+      const shot = state.basketball.shotClockSeconds > 0 ? ` • Shot ${state.basketball.shotClock}` : '';
       lines.push(`${teamName(state, state.basketball.possession)} possession • Fouls ${state.teamA.fouls}–${state.teamB.fouls} • TO ${state.basketball.timeouts.A}–${state.basketball.timeouts.B}${shot}`);
     }
   } else if (state.sport === 'soccer') {
@@ -339,9 +339,10 @@ function basketballPlayerTable(state,side) {
 function basketballMarkup(state) {
   const labels = Array.from({length:Math.max(4,num(state.period))},(_,i)=>i<4?`Q${i+1}`:`OT${i-3}`);
   const b = state.basketball || {};
-  const shot = b.shotClockSeconds > 0 ? `<span><b>${b.shotClock}</b>Shot clock</span>` : '';
-  const live = `<div class="full-stat-grid"><span><b>${state.teamA.fouls}–${state.teamB.fouls}</b>Team fouls</span><span><b>${b.timeouts?.A ?? 0}–${b.timeouts?.B ?? 0}</b>Timeouts left</span><span><b>${esc(teamName(state,b.possession || 'A'))}</b>Possession</span>${shot}</div>`;
-  const players = state.trackingMode === 'advanced' ? basketballPlayerTable(state,'A') + basketballPlayerTable(state,'B') : '';
+  const detailed = state.trackingMode === 'advanced';
+  const shot = detailed && b.shotClockSeconds > 0 ? `<span><b>${b.shotClock}</b>Shot clock</span>` : '';
+  const live = detailed ? `<div class="full-stat-grid"><span><b>${state.teamA.fouls}–${state.teamB.fouls}</b>Team fouls</span><span><b>${b.timeouts?.A ?? 0}–${b.timeouts?.B ?? 0}</b>Timeouts left</span><span><b>${esc(teamName(state,b.possession || 'A'))}</b>Possession</span>${shot}</div>` : '';
+  const players = detailed ? basketballPlayerTable(state,'A') + basketballPlayerTable(state,'B') : '';
   const timeline = state.trackingMode === 'advanced'
     ? `<section class="full-score-section basketball-events-section"><h3>Play by play</h3>${basketballTimeline(state)}</section>`
     : '';
