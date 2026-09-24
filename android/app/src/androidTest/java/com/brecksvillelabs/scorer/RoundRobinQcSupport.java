@@ -86,9 +86,10 @@ abstract class RoundRobinQcSupport {
             " delete personas[" + q(sport) + "];" +
             " localStorage.setItem(personaKey,JSON.stringify(personas));" +
             " localStorage.removeItem('scorer-state-v2');" +
-            " location.reload(); return true;" +
+            " return true;" +
             " })()"
         );
+        reloadWebView(webView);
 
         waitForJsTrue(webView,
             "Boolean(document.getElementById('startGameBtn') && document.querySelector('.sport-choice[data-sport=" + sport + "]'))",
@@ -371,23 +372,42 @@ abstract class RoundRobinQcSupport {
             .replace("\n", "\\n") + "'";
     }
 
+    protected void reloadWebView(WebView webView) throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
+        webView.post(() -> {
+            webView.reload();
+            latch.countDown();
+        });
+        assertTrue("Timed out dispatching QC WebView reload", latch.await(5, TimeUnit.SECONDS));
+        SystemClock.sleep(500);
+    }
+
     protected void waitForJsTrue(WebView webView, String script, long timeoutMs, String description) throws Exception {
         long deadline = SystemClock.elapsedRealtime() + timeoutMs;
         do {
-            if ("true".equals(evaluate(webView, script))) return;
+            long remaining = deadline - SystemClock.elapsedRealtime();
+            if (remaining <= 0) break;
+            String value = evaluateForWait(webView, script, Math.min(2000, remaining));
+            if ("true".equals(value)) return;
             SystemClock.sleep(150);
         } while (SystemClock.elapsedRealtime() < deadline);
         throw new AssertionError("Timed out waiting for packaged Scorer " + description);
     }
 
-    protected String evaluate(WebView webView, String script) throws Exception {
+    private String evaluateForWait(WebView webView, String script, long timeoutMs) throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> result = new AtomicReference<>();
         webView.post(() -> webView.evaluateJavascript(script, value -> {
             result.set(value);
             latch.countDown();
         }));
-        assertTrue("Timed out evaluating QC JavaScript", latch.await(20, TimeUnit.SECONDS));
+        if (!latch.await(Math.max(1, timeoutMs), TimeUnit.MILLISECONDS)) return null;
         return result.get();
+    }
+
+    protected String evaluate(WebView webView, String script) throws Exception {
+        String value = evaluateForWait(webView, script, 20000);
+        assertTrue("Timed out evaluating QC JavaScript", value != null);
+        return value;
     }
 }
