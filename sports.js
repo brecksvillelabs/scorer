@@ -122,7 +122,18 @@ export function createInitialState(options = {}) {
       winBy: Number(options.winBy || 2), servingTeam: options.servingTeam === 'B' ? 'B' : 'A',
       firstServer: options.servingTeam === 'B' ? 'B' : 'A', phase: 'live', setHistory: [], timeouts: { A: 2, B: 2 }, matchWinner: null
     },
-    basketball: { possession: 'A', timeouts: { A: 5, B: 5 } },
+    basketball: {
+      possession: 'A',
+      timeouts: { A: 5, B: 5 },
+      selectedPlayer: { A:'', B:'' },
+      playerStats: {
+        A: Object.fromEntries(teamA.roster.map(name => [name, { name, points:0, fouls:0 }])),
+        B: Object.fromEntries(teamB.roster.map(name => [name, { name, points:0, fouls:0 }]))
+      },
+      shotClockSeconds: Number(options.basketballShotClock || 24),
+      shotClock: Number(options.basketballShotClock || 24),
+      shotClockRunning: false
+    },
     soccer: { stoppage: 0, selectedPlayer: { A:'', B:'' } },
     football: { down: 1, distance: 10, possession: 'A', timeouts: { A: 3, B: 3 } },
     tennis: {
@@ -230,6 +241,22 @@ export function normalizeSportFoundationState(state) {
     next.volleyball.firstServer ||= next.volleyball.servingTeam || 'A';
     next.volleyball.phase ||= next.finished ? 'final' : 'live';
   }
+  if (next.basketball) {
+    next.basketball.selectedPlayer ||= { A:'', B:'' };
+    next.basketball.playerStats ||= { A:{}, B:{} };
+    next.basketball.playerStats.A ||= {};
+    next.basketball.playerStats.B ||= {};
+    for (const side of ['A','B']) {
+      const roster = cleanRoster(next[teamKey(side)]?.roster || []);
+      next[teamKey(side)].roster = roster;
+      for (const name of roster) {
+        next.basketball.playerStats[side][name] ||= { name, points:0, fouls:0 };
+      }
+    }
+    next.basketball.shotClockSeconds = Math.max(0, Number(next.basketball.shotClockSeconds ?? 24));
+    next.basketball.shotClock = Math.max(0, Number(next.basketball.shotClock ?? next.basketball.shotClockSeconds));
+    next.basketball.shotClockRunning = Boolean(next.basketball.shotClockRunning);
+  }
   if (next.tennis) next.tennis.phase ||= next.finished ? 'final' : 'live';
   if (next.badminton) next.badminton.phase ||= next.finished ? 'final' : 'live';
   return next;
@@ -244,6 +271,111 @@ export function applySimpleScore(state, side, delta) {
     clockSeconds: next.clock?.seconds
   });
   next.updatedAt = Date.now(); return next;
+}
+
+function basketballPlayer(next, side, name) {
+  const clean = String(name || '').trim();
+  if (!clean) return null;
+  next.basketball.playerStats ||= { A:{}, B:{} };
+  next.basketball.playerStats[side] ||= {};
+  next.basketball.playerStats[side][clean] ||= { name: clean, points:0, fouls:0 };
+  return next.basketball.playerStats[side][clean];
+}
+
+export function basketballScore(state, side, points = 1, player = '') {
+  const next = clone(state);
+  if (next.sport !== 'basketball' || next.finished || !['A','B'].includes(side)) return next;
+  const amount = Number(points || 0);
+  const key = teamKey(side);
+  const before = Number(next[key].score || 0);
+  next[key].score = Math.max(0, before + amount);
+  const applied = next[key].score - before;
+  if (applied !== 0) {
+    const stat = basketballPlayer(next, side, player);
+    if (stat) stat.points = Math.max(0, Number(stat.points || 0) + applied);
+    appendCoreEvent(next, applied > 0 ? 'basketball.score' : 'basketball.score_corrected', {
+      side,
+      points: applied,
+      delta: applied,
+      player: String(player || '').trim() || undefined,
+      scoreA: next.teamA.score,
+      scoreB: next.teamB.score,
+      clockSeconds: next.clock?.seconds
+    });
+    if (applied > 0) {
+      next.basketball.possession = otherSide(side);
+      if (next.basketball.shotClockSeconds > 0) {
+        next.basketball.shotClock = next.basketball.shotClockSeconds;
+        next.basketball.shotClockRunning = false;
+      }
+    }
+  }
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function basketballFoul(state, side, player = '') {
+  const next = clone(state);
+  if (next.sport !== 'basketball' || next.finished || !['A','B'].includes(side)) return next;
+  const key = teamKey(side);
+  next[key].fouls = Math.max(0, Number(next[key].fouls || 0) + 1);
+  const stat = basketballPlayer(next, side, player);
+  if (stat) stat.fouls = Math.max(0, Number(stat.fouls || 0) + 1);
+  appendCoreEvent(next, 'basketball.foul', {
+    side,
+    player: String(player || '').trim() || undefined,
+    fouls: next[key].fouls,
+    scoreA: next.teamA.score,
+    scoreB: next.teamB.score,
+    clockSeconds: next.clock?.seconds
+  });
+  next.clock.running = false;
+  next.basketball.shotClockRunning = false;
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function setBasketballPossession(state, side) {
+  const next = clone(state);
+  if (next.sport !== 'basketball' || !['A','B'].includes(side)) return next;
+  next.basketball.possession = side;
+  appendCoreEvent(next, 'basketball.possession', { side, clockSeconds: next.clock?.seconds });
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function basketballShotClockAction(state, action) {
+  const next = clone(state);
+  if (next.sport !== 'basketball' || !next.basketball || next.basketball.shotClockSeconds <= 0) return next;
+  if (action === 'reset24') {
+    next.basketball.shotClock = next.basketball.shotClockSeconds;
+    next.basketball.shotClockRunning = false;
+  } else if (action === 'reset14') {
+    next.basketball.shotClock = Math.min(14, next.basketball.shotClockSeconds);
+    next.basketball.shotClockRunning = false;
+  } else if (action === 'toggle') {
+    next.basketball.shotClockRunning = !next.basketball.shotClockRunning;
+  }
+  appendCoreEvent(next, 'basketball.shot_clock', {
+    action,
+    seconds: next.basketball.shotClock,
+    clockSeconds: next.clock?.seconds
+  });
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function finishBasketballMatch(state) {
+  const next = clone(state);
+  if (next.sport !== 'basketball' || next.finished) return next;
+  const a = Number(next.teamA.score || 0);
+  const b = Number(next.teamB.score || 0);
+  if (a === b) return next;
+  next.clock.running = false;
+  next.basketball.shotClockRunning = false;
+  finish(next, a > b ? 'A' : 'B', 'basketball');
+  next.updatedAt = Date.now();
+  return next;
 }
 
 export function soccerGoal(state, side, delta = 1, player = '') {
@@ -533,7 +665,15 @@ export function advancePeriod(state, delta = 1) {
   const tiedForOvertime = numScore(next.teamA.score) === numScore(next.teamB.score);
   const overtimeCeiling = overtimeSport && delta > 0 && before >= max && tiedForOvertime ? before + 1 : Math.max(max,before);
   next.period = Math.min(overtimeCeiling, Math.max(1, next.period + delta));
-  if (next.sport === 'basketball' && delta > 0 && next.period !== before) { next.teamA.fouls = 0; next.teamB.fouls = 0; }
+  if (next.sport === 'basketball' && delta > 0 && next.period !== before) {
+    next.teamA.fouls = 0;
+    next.teamB.fouls = 0;
+    if (next.basketball) {
+      next.basketball.shotClock = next.basketball.shotClockSeconds;
+      next.basketball.shotClockRunning = false;
+      next.basketball.selectedPlayer = { A:'', B:'' };
+    }
+  }
   if (next.sport === 'football' && before === 2 && next.period === 3) next.football.timeouts = { A: 3, B: 3 };
   if (next.clock.mode === 'down') next.clock.seconds = next.clock.periodSeconds;
   if (next.clock.mode === 'up') next.clock.seconds = 0;
@@ -548,6 +688,13 @@ export function tickClock(state) {
   const next = clone(state); if (!next.clock.running) return next;
   if (next.clock.mode === 'down') { next.clock.seconds = Math.max(0, next.clock.seconds - 1); if (!next.clock.seconds) next.clock.running = false; }
   else if (next.clock.mode === 'up') next.clock.seconds += 1;
+  if (next.sport === 'basketball' && next.basketball?.shotClockRunning && next.basketball.shotClock > 0) {
+    next.basketball.shotClock = Math.max(0, next.basketball.shotClock - 1);
+    if (next.basketball.shotClock === 0) {
+      next.basketball.shotClockRunning = false;
+      appendCoreEvent(next, 'basketball.shot_clock_expired', { possession: next.basketball.possession, clockSeconds: next.clock.seconds });
+    }
+  }
   next.updatedAt = Date.now(); return next;
 }
 
@@ -556,7 +703,12 @@ export function swapSides(state) {
   const flip = (v) => v === 'A' ? 'B' : v === 'B' ? 'A' : v;
   next.winner = flip(next.winner);
   if (next.volleyball) { next.volleyball.servingTeam = flip(next.volleyball.servingTeam); next.volleyball.matchWinner = flip(next.volleyball.matchWinner); next.volleyball.timeouts = { A: next.volleyball.timeouts.B, B: next.volleyball.timeouts.A }; }
-  if (next.basketball) { next.basketball.possession = flip(next.basketball.possession); next.basketball.timeouts = { A: next.basketball.timeouts.B, B: next.basketball.timeouts.A }; }
+  if (next.basketball) {
+    next.basketball.possession = flip(next.basketball.possession);
+    next.basketball.timeouts = { A: next.basketball.timeouts.B, B: next.basketball.timeouts.A };
+    if (next.basketball.selectedPlayer) next.basketball.selectedPlayer = { A: next.basketball.selectedPlayer.B || '', B: next.basketball.selectedPlayer.A || '' };
+    if (next.basketball.playerStats) [next.basketball.playerStats.A,next.basketball.playerStats.B]=[next.basketball.playerStats.B,next.basketball.playerStats.A];
+  }
   if (next.football) { next.football.possession = flip(next.football.possession); next.football.timeouts = { A: next.football.timeouts.B, B: next.football.timeouts.A }; }
   if (next.tennis) { next.tennis.servingTeam = flip(next.tennis.servingTeam); next.tennis.matchWinner = flip(next.tennis.matchWinner); [next.tennis.points.A,next.tennis.points.B]=[next.tennis.points.B,next.tennis.points.A]; [next.tennis.games.A,next.tennis.games.B]=[next.tennis.games.B,next.tennis.games.A]; [next.tennis.sets.A,next.tennis.sets.B]=[next.tennis.sets.B,next.tennis.sets.A]; }
   if (next.badminton) { next.badminton.servingTeam = flip(next.badminton.servingTeam); next.badminton.matchWinner = flip(next.badminton.matchWinner); [next.badminton.points.A,next.badminton.points.B]=[next.badminton.points.B,next.badminton.points.A]; [next.badminton.games.A,next.badminton.games.B]=[next.badminton.games.B,next.badminton.games.A]; }
