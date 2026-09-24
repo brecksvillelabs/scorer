@@ -124,7 +124,7 @@ abstract class RoundRobinQcSupport {
     }
 
     protected void saveTeam(WebView webView, String sport, TeamFixture team) throws Exception {
-        String svg = logoSvg(team);
+        String svg = logoSvg(sport, team);
         evaluate(webView,
             "(() => {" +
             " document.getElementById('favoriteSelectA').value='';" +
@@ -349,14 +349,15 @@ abstract class RoundRobinQcSupport {
         return Environment.DIRECTORY_DOWNLOADS + "/scorer-qc/" + subdir + "/";
     }
 
-    protected String logoSvg(TeamFixture team) {
+    protected String logoSvg(String sport, TeamFixture team) {
+        String label = sport == null ? "QC" : sport.toUpperCase();
         return "<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'>" +
             "<rect x='6' y='6' width='148' height='148' rx='34' fill='" + team.color + "' stroke='white' stroke-width='8'/>" +
             "<circle cx='80' cy='62' r='35' fill='rgba(255,255,255,0.16)'/>" +
             "<path d='M28 116 L80 90 L132 116 L80 142 Z' fill='rgba(255,255,255,0.18)'/>" +
             "<text x='80' y='73' text-anchor='middle' font-family='sans-serif' font-weight='700' font-size='28' fill='white'>" +
             team.initials + "</text>" +
-            "<text x='80' y='126' text-anchor='middle' font-family='sans-serif' font-weight='700' font-size='14' fill='white'>VOLLEYBALL</text>" +
+            "<text x='80' y='126' text-anchor='middle' font-family='sans-serif' font-weight='700' font-size='14' fill='white'>" + label + "</text>" +
             "</svg>";
     }
 

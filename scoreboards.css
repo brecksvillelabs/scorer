@@ -153,3 +153,18 @@ html[data-theme="light"] .full-score-table td:first-child{background:#fff}
   .fan-score-btn{font-size:.76rem}
   .full-score-hero strong b{font-size:1.75rem}
 }
+
+
+/* soccer full scorecard */
+.soccer-events-section{overflow:visible}
+.soccer-event-list{display:grid}
+.soccer-event-row{display:grid;grid-template-columns:54px 28px minmax(0,1fr);align-items:center;gap:10px;padding:12px 15px;border-top:1px solid var(--line)}
+.soccer-event-row time{font-variant-numeric:tabular-nums;color:#55ddd1;font-weight:950}
+.soccer-event-icon{display:grid;place-items:center;font-size:1.1rem}
+.soccer-event-card{display:block;width:12px;height:18px;border-radius:2px;box-shadow:0 2px 4px rgba(0,0,0,.24)}
+.soccer-event-card.yellow{background:#facc15}
+.soccer-event-card.red{background:#ef4444}
+.soccer-event-row strong{display:block}
+.soccer-event-row small{display:block;margin-top:2px;color:var(--muted);font-weight:750}
+.soccer-event-row.correction{opacity:.62}
+.soccer-event-empty{padding:18px 15px;border-top:1px solid var(--line);color:var(--muted)}

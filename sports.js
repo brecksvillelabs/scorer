@@ -123,7 +123,7 @@ export function createInitialState(options = {}) {
       firstServer: options.servingTeam === 'B' ? 'B' : 'A', phase: 'live', setHistory: [], timeouts: { A: 2, B: 2 }, matchWinner: null
     },
     basketball: { possession: 'A', timeouts: { A: 5, B: 5 } },
-    soccer: { stoppage: 0 },
+    soccer: { stoppage: 0, selectedPlayer: { A:'', B:'' } },
     football: { down: 1, distance: 10, possession: 'A', timeouts: { A: 3, B: 3 } },
     tennis: {
       bestOf: Number(options.tennisBestOf || 3), points: { A: 0, B: 0 }, games: { A: 0, B: 0 }, sets: { A: 0, B: 0 },
@@ -244,6 +244,65 @@ export function applySimpleScore(state, side, delta) {
     clockSeconds: next.clock?.seconds
   });
   next.updatedAt = Date.now(); return next;
+}
+
+export function soccerGoal(state, side, delta = 1, player = '') {
+  const next = clone(state);
+  if (next.sport !== 'soccer' || next.finished || !['A','B'].includes(side)) return next;
+  const key = teamKey(side);
+  const before = Number(next[key].score || 0);
+  const requested = Number(delta || 0);
+  next[key].score = Math.max(0, before + requested);
+  const applied = next[key].score - before;
+  if (applied !== 0) {
+    appendCoreEvent(next, 'soccer.goal', {
+      side,
+      delta: applied,
+      score: next[key].score,
+      scoreA: next.teamA.score,
+      scoreB: next.teamB.score,
+      clockSeconds: next.clock?.seconds,
+      player: String(player || '').trim() || undefined
+    });
+  }
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function soccerCard(state, side, card, delta = 1, player = '') {
+  const next = clone(state);
+  if (next.sport !== 'soccer' || next.finished || !['A','B'].includes(side)) return next;
+  const field = card === 'red' ? 'reds' : card === 'yellow' ? 'yellows' : null;
+  if (!field) return next;
+  const key = teamKey(side);
+  const before = Number(next[key][field] || 0);
+  const requested = Number(delta || 0);
+  next[key][field] = Math.max(0, before + requested);
+  const applied = next[key][field] - before;
+  if (applied !== 0) {
+    appendCoreEvent(next, `soccer.${card}`, {
+      side,
+      delta: applied,
+      count: next[key][field],
+      scoreA: next.teamA.score,
+      scoreB: next.teamB.score,
+      clockSeconds: next.clock?.seconds,
+      player: String(player || '').trim() || undefined
+    });
+  }
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function finishSoccerMatch(state) {
+  const next = clone(state);
+  if (next.sport !== 'soccer' || next.finished) return next;
+  next.clock.running = false;
+  const a = Number(next.teamA.score || 0);
+  const b = Number(next.teamB.score || 0);
+  finish(next, a === b ? 'tie' : a > b ? 'A' : 'B', 'soccer');
+  next.updatedAt = Date.now();
+  return next;
 }
 
 export function volleyballPoint(state, side, delta = 1) {

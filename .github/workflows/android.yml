@@ -56,8 +56,8 @@ jobs:
             mkdir -p android/qc-artifacts/debug
             adb shell ls /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc || true
             adb pull /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc android/qc-artifacts/debug/ || true
-            adb shell ls /sdcard/Download/scorer-qc/volleyball-reference || true
-            adb pull /sdcard/Download/scorer-qc/volleyball-reference android/qc-artifacts/debug/ || true
+            adb shell ls /sdcard/Download/scorer-qc || true
+            adb pull /sdcard/Download/scorer-qc android/qc-artifacts/debug/shared/ || true
             exit $status
 
       - name: Upload Android notification test reports
@@ -152,8 +152,8 @@ jobs:
             mkdir -p android/qc-artifacts/release
             adb shell ls /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc || true
             adb pull /sdcard/Android/data/com.brecksvillelabs.scorer/files/scorer-qc android/qc-artifacts/release/ || true
-            adb shell ls /sdcard/Download/scorer-qc/volleyball-reference || true
-            adb pull /sdcard/Download/scorer-qc/volleyball-reference android/qc-artifacts/release/ || true
+            adb shell ls /sdcard/Download/scorer-qc || true
+            adb pull /sdcard/Download/scorer-qc android/qc-artifacts/release/shared/ || true
             exit $status
 
       - name: Upload Android 16 release test reports
