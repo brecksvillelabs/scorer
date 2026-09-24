@@ -212,6 +212,7 @@ function startFromSetup() {
     tennisBestOf:Number($('settingTennisBestOf')?.value || 3), badmintonBestOf:Number($('settingBadmintonBestOf')?.value || 3), badmintonGameTo:Number($('settingBadmintonGameTo')?.value || 21),
     lacrosseDiscipline:$('settingLacrosseDiscipline')?.value || 'field', lacrosseShotClock:Number($('settingLacrosseShotClock')?.value || 0),
     kabaddiRaidSeconds:Number($('settingKabaddiRaidSeconds')?.value || 30), kabaddiFirstRaid:$('settingKabaddiFirstRaid')?.value || 'A',
+    basketballShotClock:Number($('settingBasketballShotClock')?.value ?? 24),
     baseballInnings:Number($('settingBaseballInnings')?.value || 9), baseballFirstBat:$('settingBaseballFirstBat')?.value || 'B'
   };
   try {
