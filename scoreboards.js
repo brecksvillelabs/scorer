@@ -70,7 +70,12 @@ function eventCount(state,type,side) {
 function currentStatus(state) {
   if (state.finished) return finalResult(state);
   if (state.sport === 'volleyball') return state.volleyball.phase === 'set_break' ? `Set break • Set ${state.period} next` : `Set ${state.period}`;
-  if (state.sport === 'basketball' || state.sport === 'football' || state.sport === 'lacrosse') {
+  if (state.sport === 'basketball') {
+    const label = state.period <= 4 ? `Q${state.period}` : `OT${state.period - 4}`;
+    if (periodHasEnded(state)) return state.period === 2 ? 'Halftime' : `End ${label}`;
+    return `${label} ${clockText(state)}`;
+  }
+  if (state.sport === 'football' || state.sport === 'lacrosse') {
     if (periodHasEnded(state)) return state.period === 2 ? 'Halftime' : `End Q${state.period}`;
     return `Q${state.period} ${clockText(state)}`;
   }
