@@ -17,6 +17,7 @@ let capability = null;
 let reminderHealth = null;
 let reminderRecovery = null;
 let lastReminderRecoveryAt = 0;
+let gamePreparationActive = false;
 
 boot040();
 
@@ -27,6 +28,14 @@ function boot040() {
     highlightId = id;
     openSchedule();
   }, () => { void recoverNativeReminders(); });
+  document.addEventListener('scorer:prepare-scheduled-game', () => {
+    gamePreparationActive = true;
+    closeHome();
+  });
+  document.addEventListener('scorer:scheduled-game-ready', () => {
+    gamePreparationActive = true;
+    closeHome();
+  });
   refreshHomeBadge();
   showFreshHome();
   setTimeout(() => { void recoverNativeReminders(); }, 250);
@@ -35,8 +44,11 @@ function boot040() {
 function showFreshHome() {
   if (localStorage.getItem('scorer-state-v2')) return;
   if (sessionStorage.getItem('scorer-v040-home-shown') === '1') return;
-  sessionStorage.setItem('scorer-v040-home-shown', '1');
   setTimeout(() => {
+    // A game setup can begin during this cold-start delay. Re-check at
+    // execution time so Home never opens over an active setup/QC flow.
+    if (localStorage.getItem('scorer-state-v2') || gamePreparationActive) return;
+    sessionStorage.setItem('scorer-v040-home-shown', '1');
     $('closeSetupBtn')?.click();
     $('homeBtn')?.click();
   }, 60);
