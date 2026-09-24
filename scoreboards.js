@@ -29,6 +29,13 @@ function liveWord(state) {
   return 'LIVE';
 }
 function clockText(state) { return formatClock(state?.clock?.seconds || 0); }
+
+function soccerMatchSeconds(state) {
+  const periodSeconds = Math.max(0, num(state?.clock?.periodSeconds) || num(state?.clock?.targetSeconds) || 2700);
+  const completed = Math.max(0, num(state?.period || 1) - 1) * periodSeconds;
+  return completed + Math.max(0, num(state?.clock?.seconds));
+}
+function soccerMinute(state) { return Math.max(0, Math.ceil(soccerMatchSeconds(state) / 60)); }
 function joinNonEmpty(parts, separator = ' · ') { return parts.filter(Boolean).join(separator); }
 function periodHasEnded(state) {
   const clock = state?.clock || {};
@@ -67,7 +74,10 @@ function currentStatus(state) {
     if (periodHasEnded(state)) return state.period === 2 ? 'Halftime' : `End Q${state.period}`;
     return `Q${state.period} ${clockText(state)}`;
   }
-  if (state.sport === 'soccer') return state.period === 1 && periodHasEnded(state) ? 'Halftime' : `${state.period === 1 ? '1st' : '2nd'} half ${clockText(state)}`;
+  if (state.sport === 'soccer') {
+    if (state.period === 1 && periodHasEnded(state)) return 'Halftime';
+    return `${state.period === 1 ? '1st' : '2nd'} half • ${soccerMinute(state)}'`;
+  }
   if (state.sport === 'cricket') {
     if (state.cricket.inningsComplete) return state.cricket.innings === 1 ? 'Innings break' : 'Innings complete';
     return `${state.cricket.innings === 1 ? '1st' : '2nd'} innings`;
@@ -249,6 +259,37 @@ function lineScore(state, labels, options = {}) {
   return `<div class="full-table-scroll"><table class="full-score-table"><thead><tr><th>Team</th>${columns}<th>T</th>${options.extraHead || ''}</tr></thead><tbody>${row('A')}${row('B')}</tbody></table></div>`;
 }
 
+function soccerEventMinute(state, event) {
+  const periodSeconds = Math.max(0, num(state?.clock?.periodSeconds) || num(state?.clock?.targetSeconds) || 2700);
+  const completed = Math.max(0, num(event?.period || 1) - 1) * periodSeconds;
+  return Math.max(0, Math.ceil((completed + Math.max(0, num(event?.clockSeconds))) / 60));
+}
+
+function soccerTimeline(state) {
+  const events = (state.events || []).filter(event =>
+    ['soccer.goal','soccer.yellow','soccer.red'].includes(event.type)
+  );
+  if (!events.length) return '<p class="soccer-event-empty">No match events recorded yet.</p>';
+  return `<div class="soccer-event-list">${events.map(event => {
+    const side = ['A','B'].includes(event.side) ? event.side : 'A';
+    const name = teamName(state,side);
+    const minute = soccerEventMinute(state,event);
+    const correction = num(event.delta) < 0;
+    const kind = event.type === 'soccer.goal' ? 'goal' : event.type === 'soccer.yellow' ? 'yellow' : 'red';
+    const label = kind === 'goal'
+      ? correction ? 'Goal corrected' : 'Goal'
+      : correction ? `${kind === 'yellow' ? 'Yellow' : 'Red'} corrected` : `${kind === 'yellow' ? 'Yellow card' : 'Red card'}`;
+    const icon = kind === 'goal' ? '⚽' : kind === 'yellow' ? '<i class="soccer-event-card yellow"></i>' : '<i class="soccer-event-card red"></i>';
+    return `<div class="soccer-event-row ${correction ? 'correction' : ''}"><time>${minute}'</time><span class="soccer-event-icon">${icon}</span><div><strong>${esc(label)}</strong><small>${esc(name)}</small></div></div>`;
+  }).join('')}</div>`;
+}
+
+function soccerMarkup(state) {
+  const hero = `<section class="full-score-hero soccer-full-hero"><div><span>${esc(currentStatus(state))}</span><strong>${esc(teamName(state,'A'))} <b>${num(state.teamA.score)}</b></strong><strong>${esc(teamName(state,'B'))} <b>${num(state.teamB.score)}</b></strong></div><p>${state.finished ? 'Full time' : `Match minute ${soccerMinute(state)}'`}</p></section>`;
+  const cards = `<div class="full-stat-grid"><span><b>${state.teamA.yellows}–${state.teamB.yellows}</b>Yellow cards</span><span><b>${state.teamA.reds}–${state.teamB.reds}</b>Red cards</span><span><b>${formatClock(soccerMatchSeconds(state))}</b>Match clock</span></div>`;
+  return `${hero}<section class="full-score-section"><h3>Half-by-half</h3>${lineScore(state,['1H','2H'])}</section>${cards}<section class="full-score-section soccer-events-section"><h3>Match events</h3>${soccerTimeline(state)}</section>`;
+}
+
 function teamSportMarkup(state) {
   let labels = ['1','2'];
   let extras = '';
@@ -381,5 +422,6 @@ export function fullScoreboardMarkup(state) {
   if (state.sport === 'volleyball') return volleyballMarkup(state);
   if (state.sport === 'tennis' || state.sport === 'badminton') return racketMarkup(state,state.sport);
   if (state.sport === 'baseball') return baseballMarkup(state);
+  if (state.sport === 'soccer') return soccerMarkup(state);
   return teamSportMarkup(state);
 }
