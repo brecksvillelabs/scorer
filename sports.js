@@ -130,8 +130,8 @@ export function createInitialState(options = {}) {
         A: Object.fromEntries(teamA.roster.map(name => [name, { name, points:0, fouls:0 }])),
         B: Object.fromEntries(teamB.roster.map(name => [name, { name, points:0, fouls:0 }]))
       },
-      shotClockSeconds: Number(options.basketballShotClock || 24),
-      shotClock: Number(options.basketballShotClock || 24),
+      shotClockSeconds: Number(options.basketballShotClock ?? 24),
+      shotClock: Number(options.basketballShotClock ?? 24),
       shotClockRunning: false
     },
     soccer: { stoppage: 0, selectedPlayer: { A:'', B:'' } },
