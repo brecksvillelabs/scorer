@@ -15,6 +15,8 @@ function boot031() {
   installEndModal();
   reconcileSavedMatch();
   observeUi();
+  document.addEventListener('scorer:prepare-scheduled-game', closeHome);
+  document.addEventListener('scorer:scheduled-game-ready', closeHome);
   queueMicrotask(refresh031);
 }
 
@@ -100,9 +102,20 @@ function openHome() {
     host.innerHTML = `<button id="v031Resume" class="v031-resume" type="button"><span class="v031-live-dot"></span><span><small>${state.finished ? 'LAST MATCH' : 'ACTIVE MATCH'}</small><strong>${escapeHtml(state.teamA?.name || 'Home')} vs ${escapeHtml(state.teamB?.name || 'Away')}</strong><em>${escapeHtml(status)}</em></span><b>${state.finished ? 'View' : 'Resume'} →</b></button>`;
     $('v031Resume')?.addEventListener('click', closeHome);
   } else host.innerHTML = '';
-  $('v031Home').classList.remove('hidden'); $('v031Home').setAttribute('aria-hidden','false');
+  const home = $('v031Home');
+  home.hidden = false;
+  home.classList.remove('hidden');
+  home.removeAttribute('inert');
+  home.setAttribute('aria-hidden','false');
 }
-function closeHome() { $('v031Home')?.classList.add('hidden'); $('v031Home')?.setAttribute('aria-hidden','true'); }
+function closeHome() {
+  const home = $('v031Home');
+  if (!home) return;
+  home.classList.add('hidden');
+  home.hidden = true;
+  home.setAttribute('inert','');
+  home.setAttribute('aria-hidden','true');
+}
 
 function openEndModal() {
   const state = readState(); if (!state || state.finished) return;
