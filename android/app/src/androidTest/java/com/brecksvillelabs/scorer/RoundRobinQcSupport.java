@@ -96,6 +96,46 @@ abstract class RoundRobinQcSupport {
             20000,
             sport + " shell reload after QC cleanup"
         );
+        dismissHomeOverlay(webView);
+        assertNoBlockingNavigation(webView, sport + " fixture setup");
+    }
+
+    protected void dismissHomeOverlay(WebView webView) throws Exception {
+        // Fresh launch intentionally shows Home. QC must explicitly dismiss it
+        // before manipulating team/setup controls.
+        SystemClock.sleep(180);
+        evaluate(webView,
+            "(() => {" +
+            " const home=document.getElementById('v031Home');" +
+            " if(!home) return true;" +
+            " if(!home.classList.contains('hidden') && !home.hidden)" +
+            "   document.getElementById('v031CloseHome')?.click();" +
+            " return true; })()"
+        );
+        waitForJsTrue(webView,
+            "(() => {" +
+            " const home=document.getElementById('v031Home');" +
+            " if(!home) return true;" +
+            " const style=getComputedStyle(home);" +
+            " return Boolean(home.hidden || (home.classList.contains('hidden')" +
+            " && home.getAttribute('aria-hidden')==='true' && style.display==='none')); })()",
+            5000,
+            "Home overlay dismissed before QC interaction"
+        );
+        SystemClock.sleep(120);
+    }
+
+    protected void assertNoBlockingNavigation(WebView webView, String description) throws Exception {
+        waitForJsTrue(webView,
+            "(() => {" +
+            " const visible=id=>{ const x=document.getElementById(id); if(!x)return false;" +
+            " const s=getComputedStyle(x); return !x.hidden && !x.classList.contains('hidden')" +
+            " && s.display!=='none' && s.visibility!=='hidden'; };" +
+            " return !visible('v031Home') && !visible('v040ScheduleModal')" +
+            " && !visible('journalModal'); })()",
+            5000,
+            description + " with no blocking navigation overlay"
+        );
     }
 
     protected void selectSport(WebView webView, String sport) throws Exception {
@@ -174,6 +214,8 @@ abstract class RoundRobinQcSupport {
     }
 
     protected void loadSavedTeamsIntoSetup(WebView webView, String sport, TeamFixture left, TeamFixture right) throws Exception {
+        dismissHomeOverlay(webView);
+        assertNoBlockingNavigation(webView, sport + " before scheduled-game setup");
         evaluate(webView,
             "document.dispatchEvent(new CustomEvent('scorer:prepare-scheduled-game',{detail:{sport:" + q(sport) + "}})); 'prepared'"
         );
@@ -214,6 +256,8 @@ abstract class RoundRobinQcSupport {
     }
 
     protected void startMatch(WebView webView, String sport, TeamFixture left, TeamFixture right) throws Exception {
+        dismissHomeOverlay(webView);
+        assertNoBlockingNavigation(webView, sport + " pre-start");
         evaluate(webView, "document.getElementById('startGameBtn').click(); 'started'");
         waitForJsTrue(webView,
             "(() => { const s=JSON.parse(localStorage.getItem('scorer-state-v2')||'null');" +
@@ -243,6 +287,7 @@ abstract class RoundRobinQcSupport {
             5000,
             sport + " setup dismissed and live scoreboard visible"
         );
+        assertNoBlockingNavigation(webView, sport + " live scoreboard");
         SystemClock.sleep(200);
     }
 
