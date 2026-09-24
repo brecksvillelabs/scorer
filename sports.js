@@ -18,8 +18,8 @@ export const SPORT_RULE_PROFILES = {
   basketball: {
     baseline: 'Four-quarter configurable basketball',
     simple: ['score', 'quarter', 'clock'],
-    advanced: ['team fouls', 'timeouts', 'possession', 'player fouls'],
-    defaults: { periods: 4, periodMinutes: 10 }
+    advanced: ['optional player scoring', 'player fouls', 'team fouls', 'timeouts', 'possession', 'shot clock'],
+    defaults: { periods: 4, periodMinutes: 10, shotClockSeconds: 24 }
   },
   soccer: {
     baseline: 'IFAB-style two-half football/soccer',
