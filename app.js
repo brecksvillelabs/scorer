@@ -1,5 +1,6 @@
 import {
-  SPORT_DEFS, createInitialState, clone, applySimpleScore, volleyballPoint, tennisPoint, formatTennisPoint,
+  SPORT_DEFS, createInitialState, clone, applySimpleScore, soccerGoal, soccerCard, finishSoccerMatch,
+  volleyballPoint, tennisPoint, formatTennisPoint,
   badmintonPoint, cricketAction, setCricketRole, switchCricketInnings, advancePeriod, tickClock, swapSides,
   formatClock, formatOvers, strikeRate, economy, getPeriodText, teamKey, otherSide, normalizeSportFoundationState
 } from './sports.js';
@@ -47,6 +48,14 @@ function createStateFor(options) {
 }
 function periodTextFor(value) { return value?.sport === 'baseball' ? getBaseballPeriodText(value) : getScorerPeriodText(value, getPeriodText); }
 function swapAllSides(value) { return value?.sport === 'baseball' ? swapBaseballSides(value, swapSides) : swapScorerSides(value, swapSides); }
+
+function soccerMatchSeconds(value = state) {
+  const periodSeconds = Math.max(0, Number(value?.clock?.periodSeconds || value?.clock?.targetSeconds || 2700));
+  const completed = Math.max(0, Number(value?.period || 1) - 1) * periodSeconds;
+  return completed + Math.max(0, Number(value?.clock?.seconds || 0));
+}
+function soccerClockText(value = state) { return formatClock(soccerMatchSeconds(value)); }
+function soccerMinuteText(value = state) { return `${Math.max(0, Math.ceil(soccerMatchSeconds(value) / 60))}'`; }
 
 function boot() {
   buildSportChoices(); bindEvents();
@@ -226,8 +235,8 @@ function startFromSetup() {
 
 function render() {
   if (!state) return; const def=SPORTS[state.sport];
-  el.sportPill.textContent=`${def.icon} ${def.name}`; el.periodText.textContent=periodTextFor(state); el.clockBtn.classList.toggle('hidden',!def.hasClock); el.clockBtn.textContent=formatClock(state.clock.seconds);
-  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else if (state.sport==='lacrosse') renderLacrosse(); else if (state.sport==='kabaddi') renderKabaddi(); else if (state.sport==='baseball') renderBaseball(); else renderTeamSport();
+  el.sportPill.textContent=`${def.icon} ${def.name}`; el.periodText.textContent=periodTextFor(state); el.clockBtn.classList.toggle('hidden',!def.hasClock); el.clockBtn.textContent=state.sport==='soccer'?soccerClockText(state):formatClock(state.clock.seconds);
+  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else if (state.sport==='lacrosse') renderLacrosse(); else if (state.sport==='kabaddi') renderKabaddi(); else if (state.sport==='baseball') renderBaseball(); else if (state.sport==='soccer') renderSoccer(); else renderTeamSport();
   renderTools(); el.undoBtn.disabled=history.length===0; el.saveStatus.textContent='Saved';
   if (!el.fullScoreboardModal.classList.contains('hidden')) renderFullScoreboard();
 }
@@ -262,6 +271,33 @@ async function shareCurrentScore(){
     const result=await shareContent({title:scoreShareTitle(state),text,dialogTitle:'Share score update'});
     if (!result.shared) { await copyText(text); toast('Score update copied — paste it into a message'); }
   } catch(error) { if(error?.name!=='AbortError') toast('Could not share the score update'); }
+}
+
+function renderSoccer() {
+  const status = state.finished ? 'FINAL' : state.period === 1 ? '1ST HALF' : '2ND HALF';
+  const team = side => {
+    const t = state[teamKey(side)];
+    const logo = t.logo ? `<img src="${t.logo}" alt="">` : esc((t.name || '?')[0].toUpperCase());
+    return `<article class="soccer-team-card" style="--team-color:${safeColor(t.color)}">
+      <div class="team-head"><div class="team-logo">${logo}</div><div style="min-width:0"><div class="team-name">${esc(t.name)}</div><div class="team-sub">${t.yellows} yellow · ${t.reds} red</div></div></div>
+      <div class="soccer-score">${t.score}</div>
+      <div class="soccer-goal-actions">
+        <button class="score-btn primary" style="--team-color:${safeColor(t.color)}" data-action="soccer-goal" data-side="${side}" data-delta="1">Goal +1</button>
+        <button class="score-btn" data-action="soccer-goal" data-side="${side}" data-delta="-1">Goal −1</button>
+      </div>
+      <div class="soccer-card-actions">
+        <button class="soccer-card-btn yellow" data-action="soccer-card" data-side="${side}" data-value="yellow"><i></i><span>Yellow</span><b>${t.yellows}</b></button>
+        <button class="soccer-card-btn red" data-action="soccer-card" data-side="${side}" data-value="red"><i></i><span>Red</span><b>${t.reds}</b></button>
+      </div>
+    </article>`;
+  };
+  el.gameSurface.innerHTML=`<section class="soccer-board">
+    <header class="soccer-match-head">
+      <div><div class="eyebrow">SOCCER · ${status}</div><strong>${state.finished ? 'Full time' : soccerMinuteText(state)}</strong></div>
+      <div class="soccer-match-clock"><span>Match clock</span><b>${soccerClockText(state)}</b><small>${state.finished ? 'Final' : state.clock.running ? 'Running' : 'Paused'}</small></div>
+    </header>
+    <div class="soccer-team-grid">${team('A')}${team('B')}</div>
+  </section>`;
 }
 
 function renderTeamSport() {
@@ -375,6 +411,16 @@ function renderTools(){
     el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Half</button><button class="tool-btn" data-action="period" data-delta="1">Next Half</button><button class="tool-btn ${state.kabaddi.raidingTeam==='A'?'active':''}" data-action="kabaddi-set-raid" data-side="A">A raids</button><button class="tool-btn ${state.kabaddi.raidingTeam==='B'?'active':''}" data-action="kabaddi-set-raid" data-side="B">B raids</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="toggle">${state.kabaddi.raidRunning?'Pause':'Start'} raid timer</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="reset">Reset ${state.kabaddi.raidSeconds}s</button><button class="tool-btn" data-action="kabaddi-technical" data-side="A">Technical +1 · A</button><button class="tool-btn" data-action="kabaddi-technical" data-side="B">Technical +1 · B</button>${timeoutTools()}</div></div>`; return;
   }
   if(s==='baseball'){ el.sportTools.innerHTML=baseballToolsMarkup(state,esc); return; }
+  if(s==='soccer'){
+    const previous = state.period === 2 && !state.finished ? '<button class="tool-btn" data-action="period" data-delta="-1">Previous Half</button>' : '';
+    const phase = state.finished
+      ? '<span class="soccer-final-chip">Match finished</span>'
+      : state.period === 1
+        ? '<button class="tool-btn primary-tool" data-action="period" data-delta="1">Start 2nd Half</button>'
+        : '<button class="tool-btn primary-tool" data-action="soccer-finish">Finish Match</button>';
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row">${previous}${phase}<span class="soccer-tools-note">Use Undo for a mistaken goal or card.</span></div></div>`;
+    return;
+  }
   const periodBtns = SPORTS[s].hasClock ? `<button class="tool-btn" data-action="period" data-delta="-1">Previous ${SPORTS[s].periodLabel}</button><button class="tool-btn" data-action="period" data-delta="1">Next ${SPORTS[s].periodLabel}</button>` : '';
   let extras='';
   if(s==='volleyball') extras=timeoutTools();
@@ -400,6 +446,9 @@ function options(list,current){return [...new Set([current,...(list||[])].filter
 function handleActionClick(e){
   const b=e.target.closest('[data-action]'); if(!b||!state)return; const action=b.dataset.action,side=b.dataset.side,delta=Number(b.dataset.delta||0); let n;
   if(action==='simple') n=applySimpleScore(state,side,delta);
+  else if(action==='soccer-goal') n=soccerGoal(state,side,delta);
+  else if(action==='soccer-card') n=soccerCard(state,side,b.dataset.value,1);
+  else if(action==='soccer-finish') n=finishSoccerMatch(state);
   else if(action==='volleyball-point') n=volleyballPoint(state,side,delta);
   else if(action==='tennis-point') n=tennisPoint(state,side);
   else if(action==='badminton-point') n=badmintonPoint(state,side);
