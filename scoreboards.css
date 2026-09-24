@@ -168,3 +168,14 @@ html[data-theme="light"] .full-score-table td:first-child{background:#fff}
 .soccer-event-row small{display:block;margin-top:2px;color:var(--muted);font-weight:750}
 .soccer-event-row.correction{opacity:.62}
 .soccer-event-empty{padding:18px 15px;border-top:1px solid var(--line);color:var(--muted)}
+
+
+/* basketball full scorecard */
+.basketball-player-section .full-score-table td:first-child{font-weight:850}
+.basketball-events-section{overflow:visible}
+.basketball-event-list{display:grid}
+.basketball-event-row{display:grid;grid-template-columns:86px minmax(0,1fr);align-items:center;gap:12px;padding:11px 15px;border-top:1px solid var(--line)}
+.basketball-event-row time{font-variant-numeric:tabular-nums;color:#55ddd1;font-weight:900;font-size:.78rem}
+.basketball-event-row strong{display:block}
+.basketball-event-row small{display:block;margin-top:2px;color:var(--muted);font-weight:750}
+.basketball-event-empty{padding:18px 15px;border-top:1px solid var(--line);color:var(--muted)}

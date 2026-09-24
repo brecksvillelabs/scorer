@@ -99,7 +99,7 @@ test('period scorecards derive familiar quarter and half tables from scoring eve
   const basketballHtml = fullScoreboardMarkup(basketball);
   assert.match(basketballHtml, /Q1/);
   assert.match(basketballHtml, /Q4/);
-  assert.match(basketballHtml, /Period scoring/);
+  assert.match(basketballHtml, /Quarter scoring/);
 
   let soccer = createInitialState(namedOptions('soccer'));
   soccer = applySimpleScore(soccer, 'B', 1);

@@ -63,6 +63,7 @@ public class AllSportsRoundRobinQcTest {
                 20000,
                 "reloaded Scorer shell"
             );
+            dismissHomeIfVisible(webView);
 
             int screenshotIndex = 1;
             for (String[] spec : SPORT_SPECS) {
@@ -250,6 +251,27 @@ public class AllSportsRoundRobinQcTest {
         );
     }
 
+    private void dismissHomeIfVisible(WebView webView) throws Exception {
+        SystemClock.sleep(180);
+        evaluate(webView,
+            "(() => {" +
+            " const home=document.getElementById('v031Home');" +
+            " if(home && !home.hidden && !home.classList.contains('hidden'))" +
+            "   document.getElementById('v031CloseHome')?.click();" +
+            " return true; })()"
+        );
+        waitForJsTrue(webView,
+            "(() => {" +
+            " const home=document.getElementById('v031Home');" +
+            " if(!home) return true;" +
+            " const style=getComputedStyle(home);" +
+            " return Boolean(home.hidden || (home.classList.contains('hidden')" +
+            " && home.getAttribute('aria-hidden')==='true' && style.display==='none')); })()",
+            5000,
+            "Home overlay dismissed for all-sports QC"
+        );
+    }
+
     private void exerciseSport(WebView webView, String sport) throws Exception {
         String action;
         String predicate;
@@ -260,13 +282,13 @@ public class AllSportsRoundRobinQcTest {
                 predicate = "s.teamA.score>=1 && s.teamB.score>=1";
                 break;
             case "basketball":
-                action = "document.querySelector('[data-action=simple][data-side=A][data-delta=\"2\"]').click();" +
-                    "document.querySelector('[data-action=simple][data-side=B][data-delta=\"3\"]').click();";
+                action = "document.querySelector('[data-action=basketball-score][data-side=A][data-delta=\"2\"]').click();" +
+                    "document.querySelector('[data-action=basketball-score][data-side=B][data-delta=\"3\"]').click();";
                 predicate = "s.teamA.score>=2 && s.teamB.score>=3";
                 break;
             case "soccer":
-                action = "document.querySelector('[data-action=simple][data-side=A][data-delta=\"1\"]').click();" +
-                    "document.querySelector('[data-action=simple][data-side=B][data-delta=\"1\"]').click();";
+                action = "document.querySelector('[data-action=soccer-goal][data-side=A][data-delta=\"1\"]').click();" +
+                    "document.querySelector('[data-action=soccer-goal][data-side=B][data-delta=\"1\"]').click();";
                 predicate = "s.teamA.score>=1 && s.teamB.score>=1";
                 break;
             case "football":

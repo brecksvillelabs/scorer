@@ -56,12 +56,14 @@ export function changeTimeout(state, side, delta) {
     appendEvent(next, after > before ? 'timeout.restored' : 'timeout.taken', {
       side,
       remaining: after,
-      limit
+      limit,
+      clockSeconds: next.clock?.seconds
     });
     next.updatedAt = Date.now();
     if (after < before) {
       if (next.clock) next.clock.running = false;
       if (next.lacrosse) next.lacrosse.shotClockRunning = false;
+      if (next.basketball) next.basketball.shotClockRunning = false;
       if (next.kabaddi) next.kabaddi.raidRunning = false;
     }
   }

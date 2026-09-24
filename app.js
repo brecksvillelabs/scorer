@@ -1,5 +1,7 @@
 import {
-  SPORT_DEFS, createInitialState, clone, applySimpleScore, soccerGoal, soccerCard, finishSoccerMatch,
+  SPORT_DEFS, createInitialState, clone, applySimpleScore,
+  basketballScore, basketballFoul, setBasketballPossession, basketballShotClockAction, finishBasketballMatch,
+  soccerGoal, soccerCard, finishSoccerMatch,
   volleyballPoint, tennisPoint, formatTennisPoint,
   badmintonPoint, cricketAction, setCricketRole, switchCricketInnings, advancePeriod, tickClock, swapSides,
   formatClock, formatOvers, strikeRate, economy, getPeriodText, teamKey, otherSide, normalizeSportFoundationState
@@ -87,6 +89,7 @@ function bindEvents() {
   el.inputRosterFileA.addEventListener('change', e => importRoster(e, 'A')); el.inputRosterFileB.addEventListener('change', e => importRoster(e, 'B'));
   el.gameSurface.addEventListener('click', handleActionClick); el.sportTools.addEventListener('click', handleActionClick);
   el.gameSurface.addEventListener('change', handleSoccerPlayerChange);
+  el.gameSurface.addEventListener('change', handleBasketballPlayerChange);
   el.sportTools.addEventListener('change', handleRoleChange);
   document.addEventListener('scorer:prepare-scheduled-game', event => prepareScheduledGame(event.detail || {}));
   document.addEventListener('keydown', e => {
@@ -121,7 +124,8 @@ function renderSportSettings() {
   if (['basketball','soccer','football'].includes(s)) {
     const mins = s === 'basketball' ? 10 : s === 'soccer' ? 45 : 15;
     body += `<label>Period length (minutes)<input id="settingMinutes" type="number" min="1" max="90" value="${mins}"></label>`;
-    if (s === 'soccer') body += `<label>Scoring detail<select id="settingTrackingMode"><option value="simple" selected>Simple scorer</option><option value="advanced">Detailed · optional players</option></select></label>`;
+    if (s === 'soccer' || s === 'basketball') body += `<label>Scoring detail<select id="settingTrackingMode"><option value="simple" selected>Simple scorer</option><option value="advanced">Detailed · optional players</option></select></label>`;
+    if (s === 'basketball') body += `<label>Shot clock <select id="settingBasketballShotClock"><option value="24" selected>24 seconds</option><option value="30">30 seconds</option><option value="0">Off</option></select></label>`;
   }
   if (s === 'lacrosse') body += `
     <label>Discipline<select id="settingLacrosseDiscipline"><option value="field" selected>Field lacrosse</option><option value="sixes">Sixes</option></select></label>
@@ -181,6 +185,7 @@ function hydrateSetup() {
     if ($('settingWinBy')) $('settingWinBy').value = state.volleyball.winBy;
     if ($('settingMinutes')) $('settingMinutes').value = Math.round(state.clock.periodSeconds / 60);
     if ($('settingTrackingMode')) $('settingTrackingMode').value = state.trackingMode === 'advanced' ? 'advanced' : 'simple';
+    if ($('settingBasketballShotClock')) $('settingBasketballShotClock').value = String(state.basketball?.shotClockSeconds ?? 24);
     if ($('settingCricketFormat')) $('settingCricketFormat').value = state.cricket.format;
     if ($('settingOvers')) $('settingOvers').value = state.cricket.oversLimit;
     if ($('settingBatting')) $('settingBatting').value = state.cricket.battingTeam;
@@ -207,6 +212,7 @@ function startFromSetup() {
     tennisBestOf:Number($('settingTennisBestOf')?.value || 3), badmintonBestOf:Number($('settingBadmintonBestOf')?.value || 3), badmintonGameTo:Number($('settingBadmintonGameTo')?.value || 21),
     lacrosseDiscipline:$('settingLacrosseDiscipline')?.value || 'field', lacrosseShotClock:Number($('settingLacrosseShotClock')?.value || 0),
     kabaddiRaidSeconds:Number($('settingKabaddiRaidSeconds')?.value || 30), kabaddiFirstRaid:$('settingKabaddiFirstRaid')?.value || 'A',
+    basketballShotClock:Number($('settingBasketballShotClock')?.value ?? 24),
     baseballInnings:Number($('settingBaseballInnings')?.value || 9), baseballFirstBat:$('settingBaseballFirstBat')?.value || 'B'
   };
   try {
@@ -214,7 +220,12 @@ function startFromSetup() {
     const n = clone(state); Object.assign(n.teamA, opts.teamA); Object.assign(n.teamB, opts.teamB);
     if (selectedSport === 'volleyball') Object.assign(n.volleyball,{bestOf:opts.bestOf,setTo:opts.setTo,decidingSetTo:opts.decidingSetTo,winBy:opts.winBy});
     if (['basketball','soccer','football','lacrosse','kabaddi'].includes(selectedSport)) { n.clock.periodSeconds = opts.periodMinutes * 60; n.clock.targetSeconds = opts.periodMinutes * 60; }
-    if (selectedSport === 'soccer') n.trackingMode = opts.trackingMode === 'advanced' ? 'advanced' : 'simple';
+    if (selectedSport === 'soccer' || selectedSport === 'basketball') n.trackingMode = opts.trackingMode === 'advanced' ? 'advanced' : 'simple';
+    if (selectedSport === 'basketball' && n.basketball) {
+      n.basketball.shotClockSeconds = Math.max(0, Number(opts.basketballShotClock ?? 24));
+      n.basketball.shotClock = Math.min(n.basketball.shotClockSeconds, Number(n.basketball.shotClock || n.basketball.shotClockSeconds));
+      n.basketball.shotClockRunning = false;
+    }
     if (selectedSport === 'lacrosse') {
       n.lacrosse.discipline = opts.lacrosseDiscipline;
       n.lacrosse.shotClockSeconds = opts.lacrosseShotClock;
@@ -241,7 +252,7 @@ function startFromSetup() {
 function render() {
   if (!state) return; const def=SPORTS[state.sport];
   el.sportPill.textContent=`${def.icon} ${def.name}`; el.periodText.textContent=periodTextFor(state); el.clockBtn.classList.toggle('hidden',!def.hasClock); el.clockBtn.textContent=state.sport==='soccer'?soccerClockText(state):formatClock(state.clock.seconds);
-  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else if (state.sport==='lacrosse') renderLacrosse(); else if (state.sport==='kabaddi') renderKabaddi(); else if (state.sport==='baseball') renderBaseball(); else if (state.sport==='soccer') renderSoccer(); else renderTeamSport();
+  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else if (state.sport==='lacrosse') renderLacrosse(); else if (state.sport==='kabaddi') renderKabaddi(); else if (state.sport==='baseball') renderBaseball(); else if (state.sport==='soccer') renderSoccer(); else if (state.sport==='basketball') renderBasketball(); else renderTeamSport();
   renderTools(); el.undoBtn.disabled=history.length===0; el.saveStatus.textContent='Saved';
   if (!el.fullScoreboardModal.classList.contains('hidden')) renderFullScoreboard();
 }
@@ -276,6 +287,75 @@ async function shareCurrentScore(){
     const result=await shareContent({title:scoreShareTitle(state),text,dialogTitle:'Share score update'});
     if (!result.shared) { await copyText(text); toast('Score update copied — paste it into a message'); }
   } catch(error) { if(error?.name!=='AbortError') toast('Could not share the score update'); }
+}
+
+function renderBasketball() {
+  const detailed = state.trackingMode === 'advanced';
+  const b = state.basketball;
+  const heroTeam = side => {
+    const t = state[teamKey(side)];
+    const logo = t.logo ? `<img src="${t.logo}" alt="">` : esc((t.name || '?')[0].toUpperCase());
+    const details = detailed
+      ? `<small>${t.fouls} fouls · ${b.timeouts[side]} TO${b.possession===side?' · ● ball':''}</small>`
+      : '';
+    return `<div class="basketball-hero-team" data-basketball-hero-team="${side}">
+      <div class="basketball-hero-logo">${logo}</div>
+      <div><strong>${esc(t.name)}</strong>${details}</div>
+    </div>`;
+  };
+  const playerSelect = side => {
+    if (!detailed) return '';
+    const t = state[teamKey(side)];
+    const selected = b.selectedPlayer?.[side] || '';
+    const rosterOptions = (t.roster || []).map(name => `<option value="${attr(name)}" ${name===selected?'selected':''}>${esc(name)}</option>`).join('');
+    return `<label class="basketball-player-select"><span>Player <small>optional</small></span><select data-basketball-player="${side}"><option value="">Team only / no player</option>${rosterOptions}</select></label>`;
+  };
+  const team = side => {
+    const t = state[teamKey(side)];
+    const logo = t.logo ? `<img src="${t.logo}" alt="">` : esc((t.name || '?')[0].toUpperCase());
+    const detailButtons = detailed ? `
+      <div class="basketball-detail-actions">
+        <button class="basketball-mini-btn" data-action="basketball-foul" data-side="${side}">Foul +1 <b>${t.fouls}</b></button>
+        <button class="basketball-mini-btn" data-action="timeout" data-side="${side}" ${b.timeouts[side]<=0?'disabled':''}>Timeout <b>${b.timeouts[side]}</b></button>
+        <button class="basketball-mini-btn ${b.possession===side?'active':''}" data-action="basketball-possession" data-side="${side}">Possession</button>
+      </div>` : '';
+    return `<article class="basketball-team-card" style="--team-color:${safeColor(t.color)}">
+      <div class="team-head">
+        <div class="team-logo">${logo}</div>
+        <div style="min-width:0"><div class="team-name">${esc(t.name)}</div><div class="team-sub">${detailed ? `${t.fouls} team fouls` : 'Quick scoring'}</div></div>
+        <div class="basketball-control-score">${t.score}</div>
+      </div>
+      ${playerSelect(side)}
+      <div class="basketball-score-actions">
+        <button class="score-btn" data-action="basketball-score" data-side="${side}" data-delta="1">+1 FT</button>
+        <button class="score-btn primary" style="--team-color:${safeColor(t.color)}" data-action="basketball-score" data-side="${side}" data-delta="2">+2</button>
+        <button class="score-btn primary" style="--team-color:${safeColor(t.color)}" data-action="basketball-score" data-side="${side}" data-delta="3">+3</button>
+        <button class="score-btn" data-action="basketball-score" data-side="${side}" data-delta="-1">−1</button>
+      </div>
+      ${detailButtons}
+    </article>`;
+  };
+  const shot = detailed && b.shotClockSeconds > 0
+    ? `<div class="basketball-shot-clock ${b.shotClock<=5?'urgent':''}"><span>SHOT</span><b>${b.shotClock}</b><small>${b.shotClockRunning?'Running':'Paused'}</small></div>`
+    : '';
+  el.gameSurface.innerHTML=`<section class="basketball-board">
+    <header class="basketball-score-hero">
+      <div class="basketball-hero-meta">
+        <span class="basketball-quarter">${state.period<=4?`Q${state.period}`:`OT${state.period-4}`}</span>
+        <div class="basketball-game-clock"><span>GAME</span><b>${formatClock(state.clock.seconds)}</b><small>${state.finished?'Final':state.clock.running?'Running':'Paused'}</small></div>
+        ${shot}
+      </div>
+      <div class="basketball-hero-matchup">
+        ${heroTeam('A')}
+        <div class="basketball-hero-scoreline" aria-label="${esc(state.teamA.name)} ${state.teamA.score} to ${state.teamB.score} ${esc(state.teamB.name)}">
+          <b data-basketball-hero-score="A">${state.teamA.score}</b><span>–</span><b data-basketball-hero-score="B">${state.teamB.score}</b>
+        </div>
+        ${heroTeam('B')}
+      </div>
+    </header>
+    ${detailed ? '<div class="basketball-detail-banner">Detailed mode · player attribution, fouls, timeouts, possession and shot clock are optional.</div>' : ''}
+    <div class="basketball-team-grid">${team('A')}${team('B')}</div>
+  </section>`;
 }
 
 function renderSoccer() {
@@ -447,6 +527,23 @@ function renderTools(){
     el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Half</button><button class="tool-btn" data-action="period" data-delta="1">Next Half</button><button class="tool-btn ${state.kabaddi.raidingTeam==='A'?'active':''}" data-action="kabaddi-set-raid" data-side="A">A raids</button><button class="tool-btn ${state.kabaddi.raidingTeam==='B'?'active':''}" data-action="kabaddi-set-raid" data-side="B">B raids</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="toggle">${state.kabaddi.raidRunning?'Pause':'Start'} raid timer</button><button class="tool-btn" data-action="kabaddi-raid-clock" data-value="reset">Reset ${state.kabaddi.raidSeconds}s</button><button class="tool-btn" data-action="kabaddi-technical" data-side="A">Technical +1 · A</button><button class="tool-btn" data-action="kabaddi-technical" data-side="B">Technical +1 · B</button>${timeoutTools()}</div></div>`; return;
   }
   if(s==='baseball'){ el.sportTools.innerHTML=baseballToolsMarkup(state,esc); return; }
+  if(s==='basketball'){
+    const detailed=state.trackingMode==='advanced';
+    const tied=Number(state.teamA.score||0)===Number(state.teamB.score||0);
+    const periodAction = state.finished
+      ? '<span class="basketball-final-chip">Game finished</span>'
+      : state.period < 4
+        ? '<button class="tool-btn primary-tool" data-action="period" data-delta="1">Next Quarter</button>'
+        : tied
+          ? '<button class="tool-btn primary-tool" data-action="period" data-delta="1">Start Overtime</button>'
+          : '<button class="tool-btn primary-tool" data-action="basketball-finish">Finish Game</button>';
+    const previous = state.period>1 && !state.finished ? '<button class="tool-btn" data-action="period" data-delta="-1">Previous Period</button>' : '';
+    const shot = detailed && state.basketball.shotClockSeconds>0
+      ? `<button class="tool-btn" data-action="basketball-shot" data-value="toggle">${state.basketball.shotClockRunning?'Pause':'Start'} shot</button><button class="tool-btn" data-action="basketball-shot" data-value="reset24">Reset ${state.basketball.shotClockSeconds}</button><button class="tool-btn" data-action="basketball-shot" data-value="reset14">Reset 14</button>`
+      : '';
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row">${previous}${periodAction}${shot}<span class="basketball-tools-note">Use Undo for any mistaken score, foul or timeout.</span></div></div>`;
+    return;
+  }
   if(s==='soccer'){
     const previous = state.period === 2 && !state.finished ? '<button class="tool-btn" data-action="period" data-delta="-1">Previous Half</button>' : '';
     const phase = state.finished
@@ -482,6 +579,11 @@ function options(list,current){return [...new Set([current,...(list||[])].filter
 function handleActionClick(e){
   const b=e.target.closest('[data-action]'); if(!b||!state)return; const action=b.dataset.action,side=b.dataset.side,delta=Number(b.dataset.delta||0); let n;
   if(action==='simple') n=applySimpleScore(state,side,delta);
+  else if(action==='basketball-score') n=basketballScore(state,side,delta,state.basketball?.selectedPlayer?.[side]||'');
+  else if(action==='basketball-foul') n=basketballFoul(state,side,state.basketball?.selectedPlayer?.[side]||'');
+  else if(action==='basketball-possession') n=setBasketballPossession(state,side);
+  else if(action==='basketball-shot') n=basketballShotClockAction(state,b.dataset.value);
+  else if(action==='basketball-finish') n=finishBasketballMatch(state);
   else if(action==='soccer-goal') n=soccerGoal(state,side,delta,state.soccer?.selectedPlayer?.[side]||'');
   else if(action==='soccer-card') n=soccerCard(state,side,b.dataset.value,1,state.soccer?.selectedPlayer?.[side]||'');
   else if(action==='soccer-finish') n=finishSoccerMatch(state);
@@ -523,6 +625,15 @@ function mutateUtility(n,action,side,delta){
   if(action==='distance') n.football.distance=Math.max(1,n.football.distance+delta);
   if(action==='set-server'){ if(n.sport==='tennis')n.tennis.servingTeam=side;if(n.sport==='badminton')n.badminton.servingTeam=side; }
   n.updatedAt=Date.now();
+}
+function handleBasketballPlayerChange(e){
+  const side=e.target?.dataset?.basketballPlayer;
+  if(!side||state?.sport!=='basketball'||!['A','B'].includes(side))return;
+  const n=clone(state);
+  n.basketball ||= {};
+  n.basketball.selectedPlayer ||= {A:'',B:''};
+  n.basketball.selectedPlayer[side]=e.target.value || '';
+  state=n; save(false); render();
 }
 function handleSoccerPlayerChange(e){
   const side=e.target?.dataset?.soccerPlayer;

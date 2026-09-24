@@ -83,3 +83,66 @@
 .soccer-player-select small{font-size:.65rem;font-weight:750;text-transform:none;letter-spacing:0}
 .soccer-player-select select{min-height:42px;width:100%;border:1px solid var(--line);border-radius:12px;background:#0b1a2a;color:var(--text);padding:0 10px;font-weight:800}
 html[data-theme="light"] .soccer-player-select select{background:#fff}
+
+
+/* basketball live scorer */
+.basketball-board{display:grid;gap:14px}
+.basketball-score-hero{display:grid;gap:14px;padding:16px 18px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,rgba(17,37,60,.98),rgba(10,23,39,.98));box-shadow:var(--shadow)}
+.basketball-hero-meta{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px}
+.basketball-quarter{display:inline-flex;align-items:center;justify-content:center;min-width:50px;min-height:30px;padding:0 10px;border-radius:999px;background:rgba(55,207,198,.1);color:#8ff5ef;font-size:.75rem;font-weight:950;letter-spacing:.08em}
+.basketball-game-clock{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:baseline;gap:1px 7px}
+.basketball-game-clock span{grid-column:1/-1;color:#8fa3b9;font-size:.62rem;font-weight:900;letter-spacing:.1em}
+.basketball-game-clock b{font-size:1.45rem;font-variant-numeric:tabular-nums}
+.basketball-game-clock small{color:#8fa3b9;font-size:.62rem;font-weight:800}
+.basketball-shot-clock{display:grid;grid-template-columns:auto auto;align-items:baseline;gap:1px 6px;justify-items:end;min-width:70px}
+.basketball-shot-clock span{grid-column:1/-1;color:#8fa3b9;font-size:.62rem;font-weight:900;letter-spacing:.1em}
+.basketball-shot-clock b{font-size:1.45rem;font-variant-numeric:tabular-nums}
+.basketball-shot-clock small{color:#8fa3b9;font-size:.62rem;font-weight:800}
+.basketball-shot-clock.urgent b{color:#f87171}
+.basketball-hero-matchup{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px}
+.basketball-hero-team{min-width:0;display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;gap:10px}
+.basketball-hero-team[data-basketball-hero-team="B"]{grid-template-columns:minmax(0,1fr) 42px;text-align:right}
+.basketball-hero-team[data-basketball-hero-team="B"] .basketball-hero-logo{grid-column:2;grid-row:1}
+.basketball-hero-team[data-basketball-hero-team="B"]>div:last-child{grid-column:1;grid-row:1}
+.basketball-hero-team strong{display:block;font-size:.9rem;line-height:1.15}
+.basketball-hero-team small{display:block;margin-top:3px;color:#8fa3b9;font-size:.68rem;font-weight:750;line-height:1.2}
+.basketball-hero-logo{width:42px;height:42px;border-radius:13px;border:1px solid var(--line);background:#0b1a2a;display:grid;place-items:center;overflow:hidden;font-weight:950}
+.basketball-hero-logo img{width:100%;height:100%;object-fit:cover}
+.basketball-hero-scoreline{display:flex;align-items:center;justify-content:center;gap:9px;min-width:118px;font-variant-numeric:tabular-nums}
+.basketball-hero-scoreline b{font-size:clamp(3rem,11vw,4.8rem);line-height:.85;letter-spacing:-.07em}
+.basketball-hero-scoreline span{color:#8fa3b9;font-size:1.45rem;font-weight:900}
+.basketball-detail-banner{padding:10px 12px;border:1px solid rgba(55,207,198,.22);border-radius:14px;background:rgba(55,207,198,.07);color:#8ff5ef;font-size:.78rem;font-weight:800}
+.basketball-team-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.basketball-team-card{border:1px solid var(--line);border-radius:22px;background:linear-gradient(180deg,rgba(17,37,60,.97),rgba(10,23,39,.97));box-shadow:var(--shadow);padding:15px;display:grid;gap:12px;overflow:hidden}
+.basketball-team-card .team-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;border-left:4px solid var(--team-color);padding-left:10px}
+.basketball-control-score{font-size:2rem;line-height:1;font-weight:950;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
+.basketball-player-select{display:grid;gap:6px}
+.basketball-player-select>span{color:#8fa3b9;font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+.basketball-player-select small{font-size:.65rem;font-weight:750;text-transform:none;letter-spacing:0}
+.basketball-player-select select{min-height:42px;width:100%;border:1px solid var(--line);border-radius:12px;background:#0b1a2a;color:var(--text);padding:0 10px;font-weight:800}
+.basketball-score-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.basketball-score-actions .score-btn{min-width:0;padding-inline:8px}
+.basketball-detail-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.basketball-mini-btn{min-height:42px;border:1px solid var(--line);border-radius:13px;background:#0b1a2a;color:var(--text);font-weight:850;padding:0 9px;cursor:pointer}
+.basketball-mini-btn.active{border-color:rgba(55,207,198,.5);background:rgba(55,207,198,.12);color:#8ff5ef}
+.basketball-mini-btn:disabled{opacity:.45}
+.basketball-tools-note{align-self:center;color:#7890aa;font-size:.78rem;font-weight:750}
+.basketball-final-chip{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border-radius:999px;background:rgba(55,207,198,.11);color:#8ff5ef;font-weight:900}
+html[data-theme="light"] .basketball-player-select select,html[data-theme="light"] .basketball-mini-btn{background:#fff}
+@media(max-width:680px){
+  .basketball-score-hero{padding:14px}
+  .basketball-hero-meta{grid-template-columns:auto 1fr auto}
+  .basketball-hero-matchup{gap:8px}
+  .basketball-hero-team{grid-template-columns:34px minmax(0,1fr);gap:7px}
+  .basketball-hero-team[data-basketball-hero-team="B"]{grid-template-columns:minmax(0,1fr) 34px}
+  .basketball-hero-logo{width:34px;height:34px;border-radius:10px}
+  .basketball-hero-team strong{font-size:.76rem;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .basketball-hero-team small{font-size:.61rem}
+  .basketball-hero-scoreline{min-width:92px;gap:6px}
+  .basketball-hero-scoreline b{font-size:2.9rem}
+  .basketball-team-grid{grid-template-columns:1fr}
+  .basketball-team-card{padding:14px}
+  .basketball-control-score{font-size:1.8rem}
+  .basketball-score-actions{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .basketball-detail-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
