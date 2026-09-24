@@ -22,15 +22,16 @@ function match() {
 test('soccer goals and cards produce a familiar chronological match-center scorecard', () => {
   let state = match();
   state.clock.seconds = 12 * 60;
-  state = soccerGoal(state,'A',1);
+  state.trackingMode = 'advanced';
+  state = soccerGoal(state,'A',1,'Ava Patel');
   state.clock.seconds = 31 * 60;
-  state = soccerCard(state,'B','yellow',1);
+  state = soccerCard(state,'B','yellow',1,'Aisha Khan');
 
   state = advancePeriod(state,1);
   state.clock.seconds = 22 * 60;
-  state = soccerGoal(state,'B',1);
+  state = soccerGoal(state,'B',1,'Grace Lee');
   state.clock.seconds = 33 * 60;
-  state = soccerCard(state,'A','red',1);
+  state = soccerCard(state,'A','red',1,'Maya Chen');
 
   const html = fullScoreboardMarkup(state);
   assert.match(html,/Half-by-half/);
@@ -47,6 +48,26 @@ test('soccer goals and cards produce a familiar chronological match-center score
   assert.match(html,/Cleveland City SC/);
   assert.match(html,/Yellow cards/);
   assert.match(html,/Red cards/);
+  assert.match(html,/Ava Patel/);
+  assert.match(html,/Aisha Khan/);
+  assert.match(html,/Grace Lee/);
+  assert.match(html,/Maya Chen/);
+});
+
+
+test('soccer simple mode keeps player attribution optional', () => {
+  let state = match();
+  assert.equal(state.trackingMode,'simple');
+  state = soccerGoal(state,'A',1);
+  state = soccerCard(state,'B','yellow',1);
+  const events = state.events.filter(event => event.type.startsWith('soccer.'));
+  assert.equal(events.length,2);
+  assert.equal(events[0].player,undefined);
+  assert.equal(events[1].player,undefined);
+  const html = fullScoreboardMarkup(state);
+  assert.match(html,/Goal/);
+  assert.match(html,/Yellow card/);
+  assert.doesNotMatch(html,/undefined/);
 });
 
 test('soccer share text keeps cumulative second-half timing and card totals', () => {
