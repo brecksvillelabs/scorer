@@ -105,8 +105,8 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
                     runClockBriefly(webView);
                 }
 
-                goal(webView, "A");
-                card(webView, "B", "yellow");
+                goal(webView, "A", left.roster[0]);
+                card(webView, "B", "yellow", right.roster[3]);
                 if (game == 0) {
                     waitForScoreAndCards(webView, 1, 0, 0, 0, 1, 0);
                     captureScreenshot(new File(artifactDir, "03-soccer-first-half-1-0-yellow.png"));
@@ -118,10 +118,10 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
 
                 if (game == 0) runClockBriefly(webView);
 
-                goal(webView, "B");
-                card(webView, "A", "yellow");
-                goal(webView, "A");
-                card(webView, "B", "red");
+                goal(webView, "B", right.roster[1]);
+                card(webView, "A", "yellow", left.roster[4]);
+                goal(webView, "A", left.roster[2]);
+                card(webView, "B", "red", right.roster[5]);
 
                 waitForScoreAndCards(webView, 2, 1, 1, 0, 1, 1);
 
@@ -143,7 +143,8 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
                 waitForJsTrue(webView,
                     "(() => { const t=document.getElementById('fullScoreboardContent')?.textContent||'';" +
                     " return t.includes('Match events') && t.includes('Yellow card') && t.includes('Red card')" +
-                    " && t.includes('Half-by-half'); })()",
+                    " && t.includes('Half-by-half') && t.includes(" + q(left.roster[0]) + ")" +
+                    " && t.includes(" + q(right.roster[1]) + "); })()",
                     5000,
                     "Soccer full match-center timeline"
                 );
@@ -189,10 +190,12 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
 
     private void setReferenceMatchFormat(WebView webView) throws Exception {
         evaluate(webView,
-            "document.getElementById('settingMinutes').value='45'; true"
+            "document.getElementById('settingMinutes').value='45';" +
+            " document.getElementById('settingTrackingMode').value='advanced'; true"
         );
         waitForJsTrue(webView,
-            "document.getElementById('settingMinutes').value==='45'",
+            "document.getElementById('settingMinutes').value==='45'" +
+            " && document.getElementById('settingTrackingMode').value==='advanced'",
             3000,
             "Soccer 45-minute half format in setup"
         );
@@ -201,7 +204,7 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
     private void waitForReferenceMatchFormat(WebView webView) throws Exception {
         waitForJsTrue(webView,
             "(() => { const s=JSON.parse(localStorage.getItem('scorer-state-v2')||'null');" +
-            " return Boolean(s && s.sport==='soccer' && s.maxPeriods===2" +
+            " return Boolean(s && s.sport==='soccer' && s.maxPeriods===2 && s.trackingMode==='advanced'" +
             " && s.clock?.mode==='up' && s.clock?.periodSeconds===2700 && s.clock?.targetSeconds===2700); })()",
             5000,
             "Soccer two 45-minute halves"
@@ -219,7 +222,22 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
         );
     }
 
-    private void goal(WebView webView, String side) throws Exception {
+    private void selectPlayer(WebView webView, String side, String player) throws Exception {
+        String result = evaluate(webView,
+            "(() => { const s=document.querySelector('[data-soccer-player=" + side + "]');" +
+            " if(!s)return false; s.value=" + q(player) + "; s.dispatchEvent(new Event('change',{bubbles:true})); return true; })()"
+        );
+        assertTrue("Could not select Soccer player " + player + " for side " + side, "true".equals(result));
+        waitForJsTrue(webView,
+            "(() => { const s=JSON.parse(localStorage.getItem('scorer-state-v2')||'null');" +
+            " return Boolean(s && s.soccer?.selectedPlayer?.[" + q(side) + "]===" + q(player) + "); })()",
+            5000,
+            "Soccer selected player " + player
+        );
+    }
+
+    private void goal(WebView webView, String side, String player) throws Exception {
+        selectPlayer(webView, side, player);
         String selector = "[data-action=soccer-goal][data-side=" + side + "][data-delta=\"1\"]";
         assertTrue("Could not score Soccer goal for side " + side,
             "true".equals(evaluate(webView,
@@ -228,7 +246,8 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
         );
     }
 
-    private void card(WebView webView, String side, String color) throws Exception {
+    private void card(WebView webView, String side, String color, String player) throws Exception {
+        selectPlayer(webView, side, player);
         String selector = "[data-action=soccer-card][data-side=" + side + "][data-value=" + color + "]";
         assertTrue("Could not add Soccer " + color + " card for side " + side,
             "true".equals(evaluate(webView,
@@ -282,12 +301,13 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
             " const goals=(s?.events||[]).filter(e=>e.type==='soccer.goal' && e.delta>0).length;" +
             " const yellows=(s?.events||[]).filter(e=>e.type==='soccer.yellow' && e.delta>0).length;" +
             " const reds=(s?.events||[]).filter(e=>e.type==='soccer.red' && e.delta>0).length;" +
+            " const named=(s?.events||[]).filter(e=>['soccer.goal','soccer.yellow','soccer.red'].includes(e.type) && e.delta>0 && Boolean(e.player)).length;" +
             " return Boolean(s && s.sport==='soccer' && s.finished===true && s.winner==='A'" +
             " && s.teamA.name===" + q(left.name) + " && s.teamB.name===" + q(right.name) +
             " && s.teamA.score===2 && s.teamB.score===1" +
             " && s.teamA.yellows===1 && s.teamA.reds===0" +
             " && s.teamB.yellows===1 && s.teamB.reds===1" +
-            " && goals===3 && yellows===2 && reds===1); })()",
+            " && goals===3 && yellows===2 && reds===1 && named===6); })()",
             10000,
             "Soccer final state for " + left.name + " vs " + right.name
         );
