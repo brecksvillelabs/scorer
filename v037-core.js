@@ -62,6 +62,7 @@ export function changeTimeout(state, side, delta) {
     if (after < before) {
       if (next.clock) next.clock.running = false;
       if (next.lacrosse) next.lacrosse.shotClockRunning = false;
+      if (next.basketball) next.basketball.shotClockRunning = false;
       if (next.kabaddi) next.kabaddi.raidRunning = false;
     }
   }
