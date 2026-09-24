@@ -98,6 +98,7 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
 
                 startMatch(webView, SPORT, left, right);
                 waitForReferenceMatchFormat(webView);
+                waitForDualTeamHero(webView, left, right, 0, 0, false);
 
                 if (game == 0) {
                     captureScreenshot(new File(artifactDir, "02-soccer-live-start.png"));
@@ -109,6 +110,7 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
                 card(webView, "B", "yellow", right.roster[3]);
                 if (game == 0) {
                     waitForScoreAndCards(webView, 1, 0, 0, 0, 1, 0);
+                    waitForDualTeamHero(webView, left, right, 1, 0, false);
                     captureScreenshot(new File(artifactDir, "03-soccer-first-half-1-0-yellow.png"));
                     screenshotCount++;
                 }
@@ -124,6 +126,7 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
                 card(webView, "B", "red", right.roster[5]);
 
                 waitForScoreAndCards(webView, 2, 1, 1, 0, 1, 1);
+                waitForDualTeamHero(webView, left, right, 2, 1, false);
 
                 if (game == 0) {
                     waitForJsTrue(webView,
@@ -138,6 +141,7 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
 
                 finishMatch(webView);
                 waitForMatchFinal(webView, left, right);
+                waitForDualTeamHero(webView, left, right, 2, 1, true);
                 openAndValidateFullScoreboard(webView, SPORT, left, right);
 
                 waitForJsTrue(webView,
@@ -279,6 +283,30 @@ public class SoccerRoundRobinQcTest extends RoundRobinQcSupport {
             "true".equals(evaluate(webView,
                 "(() => { const b=document.querySelector('[data-action=soccer-finish]'); if(!b)return false; b.click(); return true; })()"
             ))
+        );
+    }
+
+    private void waitForDualTeamHero(WebView webView, TeamFixture left, TeamFixture right,
+                                     int scoreA, int scoreB, boolean finished) throws Exception {
+        waitForJsTrue(webView,
+            "(() => {" +
+            " const h=document.querySelector('.soccer-score-hero');" +
+            " if(!h) return false;" +
+            " const a=h.querySelector('[data-hero-team=A]');" +
+            " const b=h.querySelector('[data-hero-team=B]');" +
+            " const sa=h.querySelector('[data-hero-score=A]');" +
+            " const sb=h.querySelector('[data-hero-score=B]');" +
+            " const status=h.querySelector('.soccer-hero-status')?.textContent||'';" +
+            " const r=h.getBoundingClientRect();" +
+            " return Boolean(getComputedStyle(h).display!=='none'" +
+            " && r.top>=0 && r.bottom<=window.innerHeight" +
+            " && a?.textContent.includes(" + q(left.name) + ")" +
+            " && b?.textContent.includes(" + q(right.name) + ")" +
+            " && sa?.textContent.trim()===" + q(String.valueOf(scoreA)) +
+            " && sb?.textContent.trim()===" + q(String.valueOf(scoreB)) +
+            " && " + (finished ? "status.includes('FINAL')" : "!status.includes('FINAL')") + "); })()",
+            7000,
+            "Soccer dual-team score hero " + left.name + " " + scoreA + "-" + scoreB + " " + right.name
         );
     }
 
