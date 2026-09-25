@@ -40,8 +40,7 @@ test('India short 3x15 supports deuce and 21-point cap', () => {
   assert.deepEqual(state.badminton.gameHistory[0].scoreB,15);
 
   let capped=make('india-3x15',{bestOf:1,gameTo:15,cap:21});
-  capped=rally(capped,'A',20);
-  capped=rally(capped,'B',20);
+  capped.badminton.points={A:20,B:20};
   capped=badmintonPoint(capped,'A');
   assert.equal(capped.finished,true);
   assert.equal(capped.badminton.gameHistory[0].scoreA,21);
