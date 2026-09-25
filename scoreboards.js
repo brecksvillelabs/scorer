@@ -189,6 +189,7 @@ export function formatShareMessage(state) {
     if (!state.finished && state.tennis.phase !== 'set_break') lines.push(`${teamName(state, state.tennis.servingTeam)} serving`);
   } else if (state.sport === 'badminton') {
     lines.push(`${a} ${state.badminton.games.A}–${state.badminton.games.B} ${b} (games) • ${currentStatus(state)} ${state.badminton.points.A}–${state.badminton.points.B}`);
+    lines.push(`${badmintonRuleLabel(state.badminton)} • to ${state.badminton.gameTo} • win by ${state.badminton.winBy} • cap ${state.badminton.cap}`);
     const games = setList(state.badminton.gameHistory);
     if (games) lines.push(`Completed games: ${games}`);
     if (!state.finished && state.badminton.phase !== 'game_break') lines.push(`${teamName(state, state.badminton.servingTeam)} serving`);
@@ -223,12 +224,26 @@ function scoreHero(state, eyebrow = currentStatus(state), detail = '') {
   return `<section class="full-score-hero"><div><span>${esc(eyebrow)}</span><strong>${esc(teamName(state,'A'))} <b>${num(state.teamA.score)}</b></strong><strong>${esc(teamName(state,'B'))} <b>${num(state.teamB.score)}</b></strong></div>${detail ? `<p>${esc(detail)}</p>` : ''}</section>`;
 }
 
+function badmintonRuleLabel(data) {
+  const labels={
+    'bai-3x21':'BAI / BWF 3×21',
+    'india-3x15':'India short 3×15',
+    'quick-1x21':'Quick 1×21',
+    'club-1x15':'Club quick 1×15',
+    custom:'Custom'
+  };
+  return labels[data?.preset] || 'Custom';
+}
+
 function racketHero(state, sport) {
   const data = state[sport];
   const unit = sport === 'tennis' ? 'sets' : 'games';
   const valueA = sport === 'tennis' ? data.sets.A : data.games.A;
   const valueB = sport === 'tennis' ? data.sets.B : data.games.B;
-  return `<section class="full-score-hero"><div><span>${esc(currentStatus(state))}</span><strong>${esc(teamName(state,'A'))} <b>${num(valueA)}</b></strong><strong>${esc(teamName(state,'B'))} <b>${num(valueB)}</b></strong></div><p>${esc(liveWord(state))} • ${esc(unit)} • best of ${num(data.bestOf)}</p></section>`;
+  const detail = sport === 'badminton'
+    ? `${liveWord(state)} • ${badmintonRuleLabel(data)} • best of ${num(data.bestOf)} • to ${num(data.gameTo)}`
+    : `${liveWord(state)} • ${unit} • best of ${num(data.bestOf)}`;
+  return `<section class="full-score-hero"><div><span>${esc(currentStatus(state))}</span><strong>${esc(teamName(state,'A'))} <b>${num(valueA)}</b></strong><strong>${esc(teamName(state,'B'))} <b>${num(valueB)}</b></strong></div><p>${esc(detail)}</p></section>`;
 }
 
 function scoreSnapshots(state, count) {
@@ -398,7 +413,10 @@ function racketMarkup(state, sport) {
   const point = sport === 'tennis' ? `${formatTennisPoint(state,'A')}–${formatTennisPoint(state,'B')}` : `${data.points.A}–${data.points.B}`;
   const between = data.phase === 'set_break' || data.phase === 'game_break';
   const liveDetails = state.finished ? '' : `<div class="full-stat-grid"><span><b>${between ? 'Break' : point}</b>${between ? 'Status' : `Current ${sport === 'tennis' ? 'point' : 'game'}`}</span><span><b>${between ? '—' : esc(teamName(state,data.servingTeam))}</b>${between ? 'Serve selected next' : 'Serving'}</span><span><b>${state.period}</b>${between ? 'Next' : 'Current'} ${sport === 'tennis' ? 'set' : 'game'}</span></div>`;
-  return `${racketHero(state,sport)}<section class="full-score-section"><h3>${sport === 'tennis' ? 'Set matrix' : 'Game matrix'}</h3><div class="full-table-scroll"><table class="full-score-table"><thead><tr><th>Player / team</th>${headers}<th>${sport === 'tennis' ? 'Sets' : 'Games'}</th></tr></thead><tbody>${row('A')}${row('B')}</tbody></table></div></section>${liveDetails}`;
+  const badmintonRules = sport === 'badminton'
+    ? `<div class="full-stat-grid"><span><b>${esc(badmintonRuleLabel(data))}</b>Preset</span><span><b>${num(data.gameTo)} / +${num(data.winBy)}</b>Target / win by</span><span><b>${num(data.cap)}</b>Cap</span><span><b>${esc(data.matchType === 'doubles' ? 'Doubles' : 'Singles')}</b>Match type</span></div>`
+    : '';
+  return `${racketHero(state,sport)}<section class="full-score-section"><h3>${sport === 'tennis' ? 'Set matrix' : 'Game matrix'}</h3><div class="full-table-scroll"><table class="full-score-table"><thead><tr><th>Player / team</th>${headers}<th>${sport === 'tennis' ? 'Sets' : 'Games'}</th></tr></thead><tbody>${row('A')}${row('B')}</tbody></table></div></section>${badmintonRules}${liveDetails}`;
 }
 
 function dismissalText(state, side, name, active, row) {

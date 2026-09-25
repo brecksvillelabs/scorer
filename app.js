@@ -141,7 +141,20 @@ function renderSportSettings() {
     <label>Overs per innings<input id="settingOvers" type="number" min="1" max="500" value="20"></label>
     <label>Batting first<select id="settingBatting"><option value="A">Side A</option><option value="B">Side B</option></select></label>`;
   if (s === 'tennis') body += `<label>Match format<select id="settingTennisBestOf"><option value="3" selected>Best of 3 sets</option><option value="5">Best of 5 sets</option></select></label>`;
-  if (s === 'badminton') body += `<label>Match format<select id="settingBadmintonBestOf"><option value="3" selected>Best of 3 games</option></select></label><label>Game to<input id="settingBadmintonGameTo" type="number" value="21" min="1" max="30"></label>`;
+  if (s === 'badminton') body += `
+    <label>Preset<select id="settingBadmintonPreset">
+      <option value="bai-3x21" selected>BAI / BWF · best of 3 to 21</option>
+      <option value="india-3x15">India short format · best of 3 to 15</option>
+      <option value="quick-1x21">Quick match · 1 game to 21</option>
+      <option value="club-1x15">Club quick · 1 game to 15</option>
+      <option value="custom">Custom</option>
+    </select></label>
+    <label>Scoring detail<select id="settingTrackingMode"><option value="simple" selected>Simple scorer</option><option value="advanced">Detailed service view</option></select></label>
+    <label>Match type<select id="settingBadmintonMatchType"><option value="singles" selected>Singles</option><option value="doubles">Doubles</option></select></label>
+    <label>Best of<input id="settingBadmintonBestOf" type="number" value="3" min="1" max="5" step="2"></label>
+    <label>Game to<input id="settingBadmintonGameTo" type="number" value="21" min="1" max="30"></label>
+    <label>Win by<input id="settingBadmintonWinBy" type="number" value="2" min="1" max="5"></label>
+    <label>Cap<input id="settingBadmintonCap" type="number" value="30" min="1" max="40"></label>`;
   const note = s === 'lacrosse' ? 'Field and Sixes use different timing. Shot-clock use is configurable so youth/domestic rules can match the competition.' :
     s === 'kabaddi' ? 'Quick Score keeps raid ownership and the raid clock prominent. Touch/bonus points can accumulate before the raid is ended.' :
     s === 'baseball' ? 'Quick Score tracks inning, R-H-E, count, outs and base occupancy. Runner advancement stays manual except for forced movement on a walk/HBP.' :
@@ -153,6 +166,20 @@ function renderSportSettings() {
     const sixes = e.target.value === 'sixes';
     $('settingMinutes').value = sixes ? 8 : 15;
     $('settingLacrosseShotClock').value = sixes ? 30 : 0;
+  });
+  $('settingBadmintonPreset')?.addEventListener('change', e => {
+    const presets={
+      'bai-3x21':{bestOf:3,gameTo:21,winBy:2,cap:30},
+      'india-3x15':{bestOf:3,gameTo:15,winBy:2,cap:21},
+      'quick-1x21':{bestOf:1,gameTo:21,winBy:2,cap:30},
+      'club-1x15':{bestOf:1,gameTo:15,winBy:2,cap:21}
+    };
+    const p=presets[e.target.value];
+    if(!p)return;
+    $('settingBadmintonBestOf').value=p.bestOf;
+    $('settingBadmintonGameTo').value=p.gameTo;
+    $('settingBadmintonWinBy').value=p.winBy;
+    $('settingBadmintonCap').value=p.cap;
   });
 }
 
@@ -190,8 +217,12 @@ function hydrateSetup() {
     if ($('settingOvers')) $('settingOvers').value = state.cricket.oversLimit;
     if ($('settingBatting')) $('settingBatting').value = state.cricket.battingTeam;
     if ($('settingTennisBestOf')) $('settingTennisBestOf').value = state.tennis.bestOf;
+    if ($('settingBadmintonPreset')) $('settingBadmintonPreset').value = state.badminton.preset || 'bai-3x21';
     if ($('settingBadmintonBestOf')) $('settingBadmintonBestOf').value = state.badminton.bestOf;
     if ($('settingBadmintonGameTo')) $('settingBadmintonGameTo').value = state.badminton.gameTo;
+    if ($('settingBadmintonWinBy')) $('settingBadmintonWinBy').value = state.badminton.winBy || 2;
+    if ($('settingBadmintonCap')) $('settingBadmintonCap').value = state.badminton.cap || 30;
+    if ($('settingBadmintonMatchType')) $('settingBadmintonMatchType').value = state.badminton.matchType || 'singles';
     if ($('settingLacrosseDiscipline')) $('settingLacrosseDiscipline').value = state.lacrosse?.discipline || 'field';
     if ($('settingLacrosseShotClock')) $('settingLacrosseShotClock').value = String(state.lacrosse?.shotClockSeconds || 0);
     if ($('settingKabaddiRaidSeconds')) $('settingKabaddiRaidSeconds').value = state.kabaddi?.raidSeconds || 30;
@@ -209,7 +240,13 @@ function startFromSetup() {
     teamB:{ name:el.inputNameB.value.trim() || 'Away', color:el.inputColorB.value, logo:pendingLogos.B, roster:parseRosterText(el.inputRosterB.value) },
     bestOf:Number($('settingBestOf')?.value || 5), setTo:Number($('settingSetTo')?.value || 25), decidingSetTo:Number($('settingDecidingSetTo')?.value || 15), winBy:Number($('settingWinBy')?.value || 2),
     periodMinutes:Number($('settingMinutes')?.value || 10), cricketFormat:$('settingCricketFormat')?.value || 'T20', oversLimit:Number($('settingOvers')?.value || 20), battingTeam:$('settingBatting')?.value || 'A',
-    tennisBestOf:Number($('settingTennisBestOf')?.value || 3), badmintonBestOf:Number($('settingBadmintonBestOf')?.value || 3), badmintonGameTo:Number($('settingBadmintonGameTo')?.value || 21),
+    tennisBestOf:Number($('settingTennisBestOf')?.value || 3),
+    badmintonPreset:$('settingBadmintonPreset')?.value || 'bai-3x21',
+    badmintonBestOf:Number($('settingBadmintonBestOf')?.value || 3),
+    badmintonGameTo:Number($('settingBadmintonGameTo')?.value || 21),
+    badmintonWinBy:Number($('settingBadmintonWinBy')?.value || 2),
+    badmintonCap:Number($('settingBadmintonCap')?.value || 30),
+    badmintonMatchType:$('settingBadmintonMatchType')?.value || 'singles',
     lacrosseDiscipline:$('settingLacrosseDiscipline')?.value || 'field', lacrosseShotClock:Number($('settingLacrosseShotClock')?.value || 0),
     kabaddiRaidSeconds:Number($('settingKabaddiRaidSeconds')?.value || 30), kabaddiFirstRaid:$('settingKabaddiFirstRaid')?.value || 'A',
     basketballShotClock:Number($('settingBasketballShotClock')?.value ?? 24),
@@ -220,7 +257,7 @@ function startFromSetup() {
     const n = clone(state); Object.assign(n.teamA, opts.teamA); Object.assign(n.teamB, opts.teamB);
     if (selectedSport === 'volleyball') Object.assign(n.volleyball,{bestOf:opts.bestOf,setTo:opts.setTo,decidingSetTo:opts.decidingSetTo,winBy:opts.winBy});
     if (['basketball','soccer','football','lacrosse','kabaddi'].includes(selectedSport)) { n.clock.periodSeconds = opts.periodMinutes * 60; n.clock.targetSeconds = opts.periodMinutes * 60; }
-    if (selectedSport === 'soccer' || selectedSport === 'basketball') n.trackingMode = opts.trackingMode === 'advanced' ? 'advanced' : 'simple';
+    if (selectedSport === 'soccer' || selectedSport === 'basketball' || selectedSport === 'badminton') n.trackingMode = opts.trackingMode === 'advanced' ? 'advanced' : 'simple';
     if (selectedSport === 'basketball' && n.basketball) {
       n.basketball.shotClockSeconds = Math.max(0, Number(opts.basketballShotClock ?? 24));
       n.basketball.shotClock = Math.min(n.basketball.shotClockSeconds, Number(n.basketball.shotClock || n.basketball.shotClockSeconds));
@@ -240,7 +277,14 @@ function startFromSetup() {
     if (selectedSport === 'baseball') n.baseball.regulationInnings = opts.baseballInnings;
     if (selectedSport === 'cricket') { n.cricket.format=opts.cricketFormat; n.cricket.oversLimit=opts.oversLimit; }
     if (selectedSport === 'tennis') n.tennis.bestOf=opts.tennisBestOf;
-    if (selectedSport === 'badminton') { n.badminton.bestOf=opts.badmintonBestOf; n.badminton.gameTo=opts.badmintonGameTo; }
+    if (selectedSport === 'badminton') {
+      n.badminton.preset=opts.badmintonPreset;
+      n.badminton.bestOf=opts.badmintonBestOf;
+      n.badminton.gameTo=opts.badmintonGameTo;
+      n.badminton.winBy=opts.badmintonWinBy;
+      n.badminton.cap=Math.max(opts.badmintonGameTo,opts.badmintonCap);
+      n.badminton.matchType=opts.badmintonMatchType==='doubles'?'doubles':'singles';
+    }
     pushCommit(n,'Match settings updated');
   } else { history=[]; state=createStateFor(opts); save(); render(); toast(`${SPORTS[selectedSport].name} ready`); }
   } finally {
@@ -484,13 +528,54 @@ function renderTennis(){
     ${racketRow('A',t.sets.A,t.games.A,formatTennisPoint(state,'A'),t.servingTeam==='A')}${racketRow('B',t.sets.B,t.games.B,formatTennisPoint(state,'B'),t.servingTeam==='B')}
     <div class="racket-controls"><button class="racket-score-btn a" data-action="tennis-point" data-side="A">Point · ${esc(state.teamA.name)}</button><button class="racket-score-btn b" data-action="tennis-point" data-side="B">Point · ${esc(state.teamB.name)}</button></div></section>`;
 }
+function badmintonPresetLabel(b){
+  const labels={
+    'bai-3x21':'BAI / BWF · 3×21',
+    'india-3x15':'India short · 3×15',
+    'quick-1x21':'Quick · 1×21',
+    'club-1x15':'Club quick · 1×15',
+    custom:'Custom'
+  };
+  return labels[b.preset] || 'Custom';
+}
 function renderBadminton(){
   const b=state.badminton;
-  el.gameSurface.innerHTML=`<section class="racket-board"><div class="racket-head"><div><div class="racket-title">Rally scoreboard</div><div class="racket-note">Best of ${b.bestOf} · game to ${b.gameTo} · win by 2, cap 30</div></div><div class="history-row">${b.gameHistory.map(h=>`<span class="history-pill">${h.scoreA}-${h.scoreB}</span>`).join('')}</div></div>
-    <div class="racket-grid-head"><span>Player / team</span><span>Games</span><span>Court</span><span>Points</span></div>
-    ${racketRow('A',b.games.A,b.servingTeam==='A'?(b.points.A%2===0?'R':'L'):'—',b.points.A,b.servingTeam==='A')}${racketRow('B',b.games.B,b.servingTeam==='B'?(b.points.B%2===0?'R':'L'):'—',b.points.B,b.servingTeam==='B')}
-    <div class="racket-controls"><button class="racket-score-btn a" data-action="badminton-point" data-side="A">Rally · ${esc(state.teamA.name)}</button><button class="racket-score-btn b" data-action="badminton-point" data-side="B">Rally · ${esc(state.teamB.name)}</button></div></section>`;
+  const detailed=state.trackingMode==='advanced';
+  const between=b.phase==='game_break';
+  const team=side=>{
+    const t=state[teamKey(side)];
+    const logo=t.logo?`<img src="${t.logo}" alt="">`:esc((t.name||'?')[0].toUpperCase());
+    const roster=(t.roster||[]).slice(0,b.matchType==='doubles'?2:1).join(' / ');
+    const serving=!between&&!state.finished&&b.servingTeam===side;
+    const court=serving?(b.points[side]%2===0?'Right court':'Left court'):'';
+    return `<div class="badminton-hero-team" data-badminton-hero-team="${side}">
+      <div class="badminton-hero-logo team-logo">${logo}</div>
+      <div class="badminton-team-copy"><strong>${esc(t.name)}</strong><small>${esc(roster|| (b.matchType==='doubles'?'Doubles':'Singles'))}</small>${serving?'<span class="badminton-serving">● SERVING</span>':''}${detailed&&court?`<em>${court}</em>`:''}</div>
+      <div class="badminton-games-won"><b>${b.games[side]}</b><span>games</span></div>
+    </div>`;
+  };
+  const history=b.gameHistory.map((h,i)=>`<span class="badminton-history-pill">G${i+1} ${h.scoreA}–${h.scoreB}</span>`).join('');
+  const status=state.finished?'FINAL':between?`GAME ${state.period} NEXT`:`GAME ${state.period}`;
+  el.gameSurface.innerHTML=`<section class="badminton-board">
+    <header class="badminton-score-hero">
+      <div class="badminton-hero-top"><span class="badminton-status">${status}</span><strong>${esc(badmintonPresetLabel(b))}</strong><small>to ${b.gameTo} · win by ${b.winBy} · cap ${b.cap}</small></div>
+      <div class="badminton-matchup">
+        ${team('A')}
+        <div class="badminton-current-score" aria-label="${esc(state.teamA.name)} ${b.points.A} to ${b.points.B} ${esc(state.teamB.name)}">
+          <b data-badminton-hero-score="A">${b.points.A}</b><span>–</span><b data-badminton-hero-score="B">${b.points.B}</b>
+        </div>
+        ${team('B')}
+      </div>
+      ${history?`<div class="badminton-history">${history}</div>`:''}
+    </header>
+    ${detailed?'<div class="badminton-detail-banner">Detailed service view · court side follows the serving side’s current score parity.</div>':''}
+    <div class="badminton-rally-grid">
+      <button class="badminton-rally-btn a" data-action="badminton-point" data-side="A">+1 rally <strong>${esc(state.teamA.name)}</strong></button>
+      <button class="badminton-rally-btn b" data-action="badminton-point" data-side="B">+1 rally <strong>${esc(state.teamB.name)}</strong></button>
+    </div>
+  </section>`;
 }
+
 function racketRow(side,col1,col2,point,serving){
   const t=state[teamKey(side)]; const roster=(t.roster||[]).slice(0,2).join(' / ');
   return `<div class="racket-row"><div class="racket-player">${serving?'<span class="serve-dot"></span>':'<span style="width:10px"></span>'}<div style="min-width:0"><div class="racket-name">${esc(t.name)}</div><div class="team-sub">${esc(roster)}</div></div></div><div class="racket-cell">${col1}</div><div class="racket-cell">${col2}</div><div class="racket-cell racket-point">${point}</div></div>`;
@@ -518,7 +603,13 @@ function renderTools(){
   const s=state.sport;
   if(s==='cricket'){ const c=state.cricket,batSide=c.battingTeam,fieldSide=otherSide(batSide),bat=state[teamKey(batSide)],field=state[teamKey(fieldSide)];
     el.sportTools.innerHTML=`<div class="tool-panel">${c.needsBowler?'<div class="bowler-alert">Over complete — select the next bowler before continuing.</div>':''}<div class="role-selects"><label>Striker<select data-role="striker">${options(bat.roster,c.striker)}</select></label><label>Non-striker<select data-role="nonStriker">${options(bat.roster,c.nonStriker)}</select></label><label>Bowler<select data-role="bowler">${options(field.roster,c.bowler)}</select></label></div><div class="tool-row"><button class="tool-btn" data-action="switch-innings">${c.innings===1?'Start 2nd innings':'Finish match'}</button></div></div>`; return; }
-  if(s==='tennis'||s==='badminton'){ const serving=s==='tennis'?state.tennis.servingTeam:state.badminton.servingTeam; el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn ${serving==='A'?'active':''}" data-action="set-server" data-side="A">${esc(state.teamA.name)} serves</button><button class="tool-btn ${serving==='B'?'active':''}" data-action="set-server" data-side="B">${esc(state.teamB.name)} serves</button></div></div>`; return; }
+  if(s==='tennis'){ const serving=state.tennis.servingTeam; el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn ${serving==='A'?'active':''}" data-action="set-server" data-side="A">${esc(state.teamA.name)} serves</button><button class="tool-btn ${serving==='B'?'active':''}" data-action="set-server" data-side="B">${esc(state.teamB.name)} serves</button></div></div>`; return; }
+  if(s==='badminton'){
+    if(state.trackingMode!=='advanced'){ el.sportTools.innerHTML=''; return; }
+    const serving=state.badminton.servingTeam;
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn ${serving==='A'?'active':''}" data-action="set-server" data-side="A">${esc(state.teamA.name)} serves</button><button class="tool-btn ${serving==='B'?'active':''}" data-action="set-server" data-side="B">${esc(state.teamB.name)} serves</button><span class="basketball-tools-note">Use this only to correct the serving side; rally scoring updates it automatically.</span></div></div>`;
+    return;
+  }
   if(s==='lacrosse'){
     const shot=state.lacrosse.shotClockSeconds>0?`<button class="tool-btn" data-action="lacrosse-shot" data-value="toggle">${state.lacrosse.shotClockRunning?'Pause':'Start'} shot clock</button><button class="tool-btn" data-action="lacrosse-shot" data-value="reset">Reset shot ${state.lacrosse.shotClockSeconds}</button>`:'';
     el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn" data-action="period" data-delta="-1">Previous Quarter</button><button class="tool-btn" data-action="period" data-delta="1">Next Quarter</button><button class="tool-btn ${state.lacrosse.possession==='A'?'active':''}" data-action="lacrosse-possession" data-side="A">${esc(state.teamA.name)} possession</button><button class="tool-btn ${state.lacrosse.possession==='B'?'active':''}" data-action="lacrosse-possession" data-side="B">${esc(state.teamB.name)} possession</button>${shot}${timeoutTools()}</div></div>`; return;
