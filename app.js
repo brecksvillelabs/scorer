@@ -549,7 +549,7 @@ function renderBadminton(){
     const serving=!between&&!state.finished&&b.servingTeam===side;
     const court=serving?(b.points[side]%2===0?'Right court':'Left court'):'';
     return `<div class="badminton-hero-team" data-badminton-hero-team="${side}">
-      <div class="badminton-hero-logo">${logo}</div>
+      <div class="badminton-hero-logo team-logo">${logo}</div>
       <div class="badminton-team-copy"><strong>${esc(t.name)}</strong><small>${esc(roster|| (b.matchType==='doubles'?'Doubles':'Singles'))}</small>${serving?'<span class="badminton-serving">● SERVING</span>':''}${detailed&&court?`<em>${court}</em>`:''}</div>
       <div class="badminton-games-won"><b>${b.games[side]}</b><span>games</span></div>
     </div>`;
