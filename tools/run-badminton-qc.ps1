@@ -28,10 +28,19 @@ try {
         throw "No ready Android emulator/device was found. Start the Scorer QC emulator and run this script again."
     }
 
+    $cordovaVars = Join-Path $repoRoot "android\capacitor-cordova-android-plugins\cordova.variables.gradle"
+    if ($SkipSync -and -not (Test-Path $cordovaVars)) {
+        Write-Host "Generated Capacitor Android files are missing; overriding -SkipSync."
+        $SkipSync = $false
+    }
+
     if (-not $SkipSync) {
         Write-Host "Syncing packaged web assets..."
         & npm.cmd run native:sync
         if ($LASTEXITCODE -ne 0) { throw "npm run native:sync failed." }
+        if (-not (Test-Path $cordovaVars)) {
+            throw "Capacitor sync completed but cordova.variables.gradle was not generated."
+        }
     }
 
     Write-Host "Removing stale Badminton QC artifacts from the emulator..."
