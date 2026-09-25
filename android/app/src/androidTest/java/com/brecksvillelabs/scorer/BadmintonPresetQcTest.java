@@ -108,7 +108,7 @@ public class BadmintonPresetQcTest extends RoundRobinQcSupport {
             captureScreenshot(new File(artifactDir, "04-badminton-india-3x15-live.png")); screenshots++;
             playGame(webView, "A", 15, "B", 11);
             playGame(webView, "B", 15, "A", 13);
-            playGame(webView, "A", 17, "B", 15);
+            playDeuceGame(webView, "A", "B", 17, 15);
             waitForFinal(webView, "india-3x15", "A", 3, 2, 1, 17, 15);
             openAndValidateFullScoreboard(webView, SPORT, left, right);
             assertScorecardPreset(webView, "India short 3×15", "17", "15");
@@ -250,6 +250,27 @@ public class BadmintonPresetQcTest extends RoundRobinQcSupport {
     private void playGame(WebView webView, String winner, int winnerPoints, String loser, int loserPoints) throws Exception {
         rally(webView, loser, loserPoints);
         rally(webView, winner, winnerPoints);
+        SystemClock.sleep(250);
+    }
+
+    private void playDeuceGame(WebView webView, String winner, String loser,
+                               int winnerPoints, int loserPoints) throws Exception {
+        int deuceBase = Math.min(winnerPoints, loserPoints) - 1;
+        rally(webView, winner, deuceBase);
+        rally(webView, loser, deuceBase);
+
+        int winnerRemaining = winnerPoints - deuceBase;
+        int loserRemaining = loserPoints - deuceBase;
+        while (winnerRemaining > 0 || loserRemaining > 0) {
+            if (winnerRemaining > 0) {
+                rally(webView, winner, 1);
+                winnerRemaining--;
+            }
+            if (loserRemaining > 0) {
+                rally(webView, loser, 1);
+                loserRemaining--;
+            }
+        }
         SystemClock.sleep(250);
     }
 
