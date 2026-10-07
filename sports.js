@@ -579,7 +579,7 @@ export function tennisPoint(state, side) {
   const p = t.points[side];
   const op = t.points[other];
   const gameWon = t.noAd
-    ? p >= 4 && op >= 3
+    ? p >= 4
     : p >= 4 && p - op >= 2;
 
   if (gameWon) {
