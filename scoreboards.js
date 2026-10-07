@@ -184,8 +184,10 @@ export function formatShareMessage(state) {
     if (!state.finished && !periodHasEnded(state)) lines.push(`${state.football.down}${state.football.down === 1 ? 'st' : state.football.down === 2 ? 'nd' : state.football.down === 3 ? 'rd' : 'th'} & ${state.football.distance} • ${teamName(state, state.football.possession)} ball • TO ${state.football.timeouts.A}–${state.football.timeouts.B}`);
   } else if (state.sport === 'tennis') {
     lines.push(`${a} ${state.tennis.sets.A}–${state.tennis.sets.B} ${b} (sets) • ${currentStatus(state)}`);
-    const sets = setList(state.tennis.setHistory);
-    lines.push(joinNonEmpty([sets ? `Sets ${sets}` : '', `Games ${state.tennis.games.A}–${state.tennis.games.B}`, `Point ${formatTennisPoint(state,'A')}–${formatTennisPoint(state,'B')}`]));
+    lines.push(`${tennisRuleLabel(state.tennis)} • ${state.tennis.noAd ? 'No-Ad' : 'Advantage'} • ${state.tennis.decidingMatchTiebreakTo > 0 ? `decider TB ${state.tennis.decidingMatchTiebreakTo}` : 'full deciding set'}`);
+    const sets = state.tennis.setHistory.map(item => item.matchTiebreak ? `MTB ${item.matchTiebreak}` : `${num(item.scoreA)}–${num(item.scoreB)}${item.tiebreak ? ` (TB ${item.tiebreak})` : ''}`).join(', ');
+    const livePoint = state.tennis.matchTiebreak ? `Match TB ${formatTennisPoint(state,'A')}–${formatTennisPoint(state,'B')}` : state.tennis.tiebreak ? `Tie-break ${formatTennisPoint(state,'A')}–${formatTennisPoint(state,'B')}` : `Games ${state.tennis.games.A}–${state.tennis.games.B} • Point ${formatTennisPoint(state,'A')}–${formatTennisPoint(state,'B')}`;
+    lines.push(joinNonEmpty([sets ? `Sets ${sets}` : '', livePoint]));
     if (!state.finished && state.tennis.phase !== 'set_break') lines.push(`${teamName(state, state.tennis.servingTeam)} serving`);
   } else if (state.sport === 'badminton') {
     lines.push(`${a} ${state.badminton.games.A}–${state.badminton.games.B} ${b} (games) • ${currentStatus(state)} ${state.badminton.points.A}–${state.badminton.points.B}`);
@@ -224,6 +226,17 @@ function scoreHero(state, eyebrow = currentStatus(state), detail = '') {
   return `<section class="full-score-hero"><div><span>${esc(eyebrow)}</span><strong>${esc(teamName(state,'A'))} <b>${num(state.teamA.score)}</b></strong><strong>${esc(teamName(state,'B'))} <b>${num(state.teamB.score)}</b></strong></div>${detail ? `<p>${esc(detail)}</p>` : ''}</section>`;
 }
 
+function tennisRuleLabel(data) {
+  const labels={
+    'standard-3':'Standard best of 3',
+    'standard-5':'Standard best of 5',
+    'no-ad-3':'No-Ad best of 3',
+    'doubles-10':'Doubles match tie-break 10',
+    custom:'Custom'
+  };
+  return labels[data?.preset] || 'Custom';
+}
+
 function badmintonRuleLabel(data) {
   const labels={
     'bai-3x21':'BAI / BWF 3×21',
@@ -242,7 +255,9 @@ function racketHero(state, sport) {
   const valueB = sport === 'tennis' ? data.sets.B : data.games.B;
   const detail = sport === 'badminton'
     ? `${liveWord(state)} • ${badmintonRuleLabel(data)} • best of ${num(data.bestOf)} • to ${num(data.gameTo)}`
-    : `${liveWord(state)} • ${unit} • best of ${num(data.bestOf)}`;
+    : sport === 'tennis'
+      ? `${liveWord(state)} • ${tennisRuleLabel(data)} • ${data.noAd ? 'No-Ad' : 'Advantage'}`
+      : `${liveWord(state)} • ${unit} • best of ${num(data.bestOf)}`;
   return `<section class="full-score-hero"><div><span>${esc(currentStatus(state))}</span><strong>${esc(teamName(state,'A'))} <b>${num(valueA)}</b></strong><strong>${esc(teamName(state,'B'))} <b>${num(valueB)}</b></strong></div><p>${esc(detail)}</p></section>`;
 }
 
@@ -398,25 +413,55 @@ function volleyballMarkup(state) {
 function racketMarkup(state, sport) {
   const data = state[sport];
   const history = sport === 'tennis' ? data.setHistory : data.gameHistory;
-  const current = sport === 'tennis' ? { scoreA:data.games.A, scoreB:data.games.B } : { scoreA:data.points.A, scoreB:data.points.B };
+  const current = sport === 'tennis'
+    ? data.matchTiebreak
+      ? { scoreA:data.matchTiebreakPoints.A, scoreB:data.matchTiebreakPoints.B, current:true, matchTiebreakCurrent:true }
+      : { scoreA:data.games.A, scoreB:data.games.B, current:true }
+    : { scoreA:data.points.A, scoreB:data.points.B, current:true };
   const sets = [...history];
-  if (!state.finished) sets.push({ ...current, current:true });
-  const headers = sets.map((_, index) => `<th>${sport === 'tennis' ? 'S' : 'G'}${index+1}</th>`).join('');
+  if (!state.finished) sets.push(current);
+
+  const headers = sets.map((item,index) => {
+    if (sport === 'tennis' && (item.matchTiebreak || item.matchTiebreakCurrent)) return '<th>MTB</th>';
+    return `<th>${sport === 'tennis' ? 'S' : 'G'}${index+1}</th>`;
+  }).join('');
+
   const won = side => sport === 'tennis' ? data.sets[side] : data.games[side];
-  const tiebreakSuffix = (item, side) => {
-    if (sport !== 'tennis' || !item.tiebreak) return '';
+
+  const tennisCell = (item, side) => {
+    if (item.matchTiebreak) {
+      const [a,b] = String(item.matchTiebreak).split('-');
+      return esc(side === 'A' ? a : b);
+    }
+    if (item.matchTiebreakCurrent) return num(item[`score${side}`]);
+    const base = num(item[`score${side}`]);
+    if (!item.tiebreak) return base;
     const [a,b] = String(item.tiebreak).split('-');
     const losingSide = num(item.scoreA) < num(item.scoreB) ? 'A' : 'B';
-    return side === losingSide ? `<small> (${esc(side === 'A' ? a : b)})</small>` : '';
+    return side === losingSide ? `${base}<small> (${esc(side === 'A' ? a : b)})</small>` : base;
   };
-  const row = side => `<tr><td>${esc(teamName(state,side))}${data.servingTeam === side && !state.finished && data.phase !== 'set_break' && data.phase !== 'game_break' ? '<i class="full-serve-dot" title="Serving"></i>' : ''}</td>${sets.map(item => `<td${item.current?' class="full-current-cell"':''}>${num(item[`score${side}`])}${tiebreakSuffix(item,side)}</td>`).join('')}<td class="full-total">${won(side)}</td></tr>`;
-  const point = sport === 'tennis' ? `${formatTennisPoint(state,'A')}–${formatTennisPoint(state,'B')}` : `${data.points.A}–${data.points.B}`;
+
+  const row = side => `<tr><td>${esc(teamName(state,side))}${data.servingTeam === side && !state.finished && data.phase !== 'set_break' && data.phase !== 'game_break' ? '<i class="full-serve-dot" title="Serving"></i>' : ''}</td>${sets.map(item => `<td${item.current?' class="full-current-cell"':''}>${sport === 'tennis' ? tennisCell(item,side) : num(item[`score${side}`])}</td>`).join('')}<td class="full-total">${won(side)}</td></tr>`;
+
+  const point = sport === 'tennis'
+    ? `${formatTennisPoint(state,'A')}–${formatTennisPoint(state,'B')}`
+    : `${data.points.A}–${data.points.B}`;
   const between = data.phase === 'set_break' || data.phase === 'game_break';
-  const liveDetails = state.finished ? '' : `<div class="full-stat-grid"><span><b>${between ? 'Break' : point}</b>${between ? 'Status' : `Current ${sport === 'tennis' ? 'point' : 'game'}`}</span><span><b>${between ? '—' : esc(teamName(state,data.servingTeam))}</b>${between ? 'Serve selected next' : 'Serving'}</span><span><b>${state.period}</b>${between ? 'Next' : 'Current'} ${sport === 'tennis' ? 'set' : 'game'}</span></div>`;
+
+  const currentUnit = sport === 'tennis' && data.matchTiebreak ? 'match tie-break' : sport === 'tennis' && data.tiebreak ? 'tie-break' : sport === 'tennis' ? 'point' : 'game';
+  const periodUnit = sport === 'tennis' && data.matchTiebreak ? 'match tie-break' : sport === 'tennis' ? 'set' : 'game';
+
+  const liveDetails = state.finished ? '' : `<div class="full-stat-grid"><span><b>${between ? 'Break' : point}</b>${between ? 'Status' : `Current ${currentUnit}`}</span><span><b>${between ? '—' : esc(teamName(state,data.servingTeam))}</b>${between ? 'Serve selected next' : 'Serving'}</span><span><b>${data.matchTiebreak ? 'MTB' : state.period}</b>${between ? 'Next' : 'Current'} ${periodUnit}</span></div>`;
+
   const badmintonRules = sport === 'badminton'
     ? `<div class="full-stat-grid"><span><b>${esc(badmintonRuleLabel(data))}</b>Preset</span><span><b>${num(data.gameTo)} / +${num(data.winBy)}</b>Target / win by</span><span><b>${num(data.cap)}</b>Cap</span><span><b>${esc(data.matchType === 'doubles' ? 'Doubles' : 'Singles')}</b>Match type</span></div>`
     : '';
-  return `${racketHero(state,sport)}<section class="full-score-section"><h3>${sport === 'tennis' ? 'Set matrix' : 'Game matrix'}</h3><div class="full-table-scroll"><table class="full-score-table"><thead><tr><th>Player / team</th>${headers}<th>${sport === 'tennis' ? 'Sets' : 'Games'}</th></tr></thead><tbody>${row('A')}${row('B')}</tbody></table></div></section>${badmintonRules}${liveDetails}`;
+
+  const tennisRules = sport === 'tennis'
+    ? `<div class="full-stat-grid"><span><b>${esc(tennisRuleLabel(data))}</b>Preset</span><span><b>${data.noAd ? 'No-Ad' : 'Advantage'}</b>Game scoring</span><span><b>${data.decidingMatchTiebreakTo > 0 ? `TB ${num(data.decidingMatchTiebreakTo)}` : 'Full set'}</b>Decider</span><span><b>${esc(data.matchType === 'doubles' ? 'Doubles' : 'Singles')}</b>Match type</span></div>`
+    : '';
+
+  return `${racketHero(state,sport)}<section class="full-score-section"><h3>${sport === 'tennis' ? 'Set matrix' : 'Game matrix'}</h3><div class="full-table-scroll"><table class="full-score-table"><thead><tr><th>Player / team</th>${headers}<th>${sport === 'tennis' ? 'Sets' : 'Games'}</th></tr></thead><tbody>${row('A')}${row('B')}</tbody></table></div></section>${tennisRules}${badmintonRules}${liveDetails}`;
 }
 
 function dismissalText(state, side, name, active, row) {
