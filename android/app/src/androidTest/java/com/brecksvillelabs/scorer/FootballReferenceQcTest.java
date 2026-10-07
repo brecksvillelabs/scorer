@@ -193,7 +193,7 @@ public class FootballReferenceQcTest extends RoundRobinQcSupport {
             setSpot(webView, 98);
             setSituation(webView, 2, 7);
             score(webView, "A", "safety", left.roster[7]);
-            waitForField(webView, right.name + " 2", "2nd & Goal", 98, "B");
+            waitForField(webView, right.name + " 2", "2nd & 7", 98, "B");
             waitForHero(webView, left, right, 2, 0, 1, false);
             captureScreenshot(new File(artifactDir, "08-football-opposite-direction-safety.png")); screenshots++;
             advanceToQuarter(webView, 4);
