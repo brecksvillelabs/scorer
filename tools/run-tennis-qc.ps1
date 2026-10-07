@@ -23,7 +23,8 @@ function Test-Java21Home([string]$javaHomePath) {
     if ([string]::IsNullOrWhiteSpace($javaHomePath)) { return $false }
     $java = Join-Path $javaHomePath "bin\java.exe"
     if (-not (Test-Path $java)) { return $false }
-    $versionText = (& $java -version 2>&1 | Out-String)
+    $cmdLine = '""' + $java + '" -version 2>&1"'
+    $versionText = (& cmd.exe /d /c $cmdLine | Out-String)
     return $versionText -match '(?m)(java|openjdk) version "21([\.|"])'
 }
 
