@@ -1,4 +1,4 @@
-import { economy, formatClock, formatOvers, formatTennisPoint, strikeRate } from './sports.js';
+import { economy, formatClock, formatOvers, formatTennisPoint, strikeRate, footballFieldSnapshot, footballSpotLabel } from './sports.js';
 
 const SPORT_META = Object.freeze({
   volleyball: { icon:'🏐', name:'Volleyball' },
@@ -181,7 +181,15 @@ export function formatShareMessage(state) {
     lines.push(`Cards: ${a} ${state.teamA.yellows}Y/${state.teamA.reds}R • ${b} ${state.teamB.yellows}Y/${state.teamB.reds}R`);
   } else if (state.sport === 'football') {
     lines.push(`${a} ${state.teamA.score}–${state.teamB.score} ${b} • ${currentStatus(state)}`);
-    if (!state.finished && !periodHasEnded(state)) lines.push(`${state.football.down}${state.football.down === 1 ? 'st' : state.football.down === 2 ? 'nd' : state.football.down === 3 ? 'rd' : 'th'} & ${state.football.distance} • ${teamName(state, state.football.possession)} ball • TO ${state.football.timeouts.A}–${state.football.timeouts.B}`);
+    if (state.trackingMode === 'advanced' && !state.finished && !periodHasEnded(state)) {
+      const snap = footballFieldSnapshot(state);
+      lines.push(`${snap.situation} • ${teamName(state, snap.possession)} ball at ${snap.ballSpotLabel} • TO ${state.football.timeouts.A}–${state.football.timeouts.B}`);
+      if (snap.lastPlay) {
+        const playYards = Number.isFinite(Number(snap.lastPlay.yards)) ? ` • ${Number(snap.lastPlay.yards) >= 0 ? '+' : ''}${snap.lastPlay.yards} yd` : '';
+        const player = snap.lastPlay.player ? ` • ${snap.lastPlay.player}` : '';
+        lines.push(`Last: ${String(snap.lastPlay.type || 'play').replaceAll('-', ' ')}${playYards}${player}`);
+      }
+    }
   } else if (state.sport === 'tennis') {
     lines.push(`${a} ${state.tennis.sets.A}–${state.tennis.sets.B} ${b} (sets) • ${currentStatus(state)}`);
     lines.push(`${tennisRuleLabel(state.tennis)} • ${state.tennis.noAd ? 'No-Ad' : 'Advantage'} • ${state.tennis.decidingMatchTiebreakTo > 0 ? `decider TB ${state.tennis.decidingMatchTiebreakTo}` : 'full deciding set'}`);
@@ -401,6 +409,65 @@ function teamSportMarkup(state) {
   return `${scoreHero(state)}<section class="full-score-section"><h3>${state.sport === 'soccer' || state.sport === 'kabaddi' ? 'Half-by-half' : 'Period scoring'}</h3>${lineScore(state,labels)}</section>${extras}`;
 }
 
+function footballEventLabel(state,event) {
+  const q = Number(event.period || 1);
+  const period = q <= 4 ? `Q${q}` : `OT${q-4}`;
+  return `${period} · ${formatClock(Number(event.clockSeconds || 0))}`;
+}
+
+function footballTimeline(state) {
+  const events=(state.events||[]).filter(event =>
+    ['football.score','football.score_corrected','football.play','football.possession','football.ball_spot','timeout.taken'].includes(event.type)
+  ).slice(-30).reverse();
+  if(!events.length)return '<p class="basketball-event-empty">No detailed football events recorded yet.</p>';
+  return `<div class="basketball-event-list">${events.map(event=>{
+    let title='Update';
+    let detail='';
+    if(event.type==='football.score'||event.type==='football.score_corrected'){
+      title=event.type==='football.score_corrected'?'Score corrected':String(event.scoringType||'Score').replaceAll('-',' ');
+      detail=`${teamName(state,event.side)}${event.player?` · ${event.player}`:''} · ${event.points>0?'+':''}${event.points}`;
+    }else if(event.type==='football.play'){
+      title=String(event.playType||'Play').replaceAll('-',' ');
+      detail=`${event.yards>=0?'+':''}${event.yards} yd${event.player?` · ${event.player}`:''} · ${footballSpotLabel(state,event.spotAfter)}`;
+    }else if(event.type==='football.possession'){
+      title='Possession';
+      detail=`${teamName(state,event.side)} ball`;
+    }else if(event.type==='football.ball_spot'){
+      title='Ball moved';
+      detail=event.label||footballSpotLabel(state,event.to);
+    }else if(event.type==='timeout.taken'){
+      title='Timeout';
+      detail=event.side?teamName(state,event.side):'';
+    }
+    return `<div class="basketball-event-row"><time>${esc(footballEventLabel(state,event))}</time><div><strong>${esc(title)}</strong><small>${esc(detail)}</small></div></div>`;
+  }).join('')}</div>`;
+}
+
+function footballFieldCard(state) {
+  const snap=footballFieldSnapshot(state);
+  const marks=[10,20,30,40,50,60,70,80,90].map(x=>`<i style="left:${x}%"><span>${x===50?'50':x<50?x:100-x}</span></i>`).join('');
+  return `<section class="full-score-section"><h3>Field position</h3>
+    <div class="football-field full-football-field">
+      <div class="football-endzone left">${esc(teamName(state,'A'))}</div>
+      <div class="football-field-grid">${marks}<div class="football-first-down-line" style="left:${snap.lineToGainSpot}%"></div><div class="football-ball-marker" style="left:${snap.ballSpot}%"><b>●</b></div></div>
+      <div class="football-endzone right">${esc(teamName(state,'B'))}</div>
+    </div>
+    <div class="football-field-caption"><span>Ball <b>${esc(snap.ballSpotLabel)}</b></span><span>Situation <b>${esc(snap.situation)}</b></span><span>Possession <b>${esc(teamName(state,snap.possession))}</b></span><span>To goal <b>${snap.yardsToGoal} yd</b></span></div>
+  </section>`;
+}
+
+function footballMarkup(state) {
+  const labels=Array.from({length:Math.max(4,Number(state.period||1))},(_,i)=>i<4?`Q${i+1}`:`OT${i-3}`);
+  const snap=footballFieldSnapshot(state);
+  const hero=scoreHero(state,currentStatus(state),state.trackingMode==='advanced'?`${snap.situation} • ${teamName(state,snap.possession)} ball • ${snap.ballSpotLabel}`:'');
+  const live=state.trackingMode==='advanced'&&!state.finished&&!periodHasEnded(state)
+    ? `<div class="full-stat-grid"><span><b>${esc(snap.situation)}</b>Down & distance</span><span><b>${esc(snap.ballSpotLabel)}</b>Ball spot</span><span><b>${esc(teamName(state,snap.possession))}</b>Possession</span><span><b>${state.football.timeouts.A}–${state.football.timeouts.B}</b>Timeouts left</span></div>`
+    : '';
+  const field=state.trackingMode==='advanced'?footballFieldCard(state):'';
+  const timeline=state.trackingMode==='advanced'?`<section class="full-score-section"><h3>Drive events</h3>${footballTimeline(state)}</section>`:'';
+  return `${hero}<section class="full-score-section"><h3>Quarter-by-quarter</h3>${lineScore(state,labels)}</section>${field}${live}${timeline}`;
+}
+
 function volleyballMarkup(state) {
   const history = [...state.volleyball.setHistory];
   if (!state.finished) history.push({ scoreA:state.teamA.score, scoreB:state.teamB.score, current:true });
@@ -546,5 +613,6 @@ export function fullScoreboardMarkup(state) {
   if (state.sport === 'baseball') return baseballMarkup(state);
   if (state.sport === 'soccer') return soccerMarkup(state);
   if (state.sport === 'basketball') return basketballMarkup(state);
+  if (state.sport === 'football') return footballMarkup(state);
   return teamSportMarkup(state);
 }
