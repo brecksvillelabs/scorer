@@ -40,8 +40,46 @@ export function quickFormatPresets(sport) {
       ];
     case 'tennis':
       return [
-        { id: 'bo3', label: 'Best of 3 sets', note: 'Most common', values: { settingTennisBestOf: '3' } },
-        { id: 'bo5', label: 'Best of 5 sets', note: 'Long format', values: { settingTennisBestOf: '5' } }
+        {
+          id: 'standard-3',
+          label: 'Standard · best of 3',
+          note: 'Advantage scoring · full deciding set',
+          values: {
+            settingTennisPreset:'standard-3', settingTrackingMode:'simple',
+            settingTennisMatchType:'singles', settingTennisBestOf:'3',
+            settingTennisNoAd:'false', settingTennisDecider:'0'
+          }
+        },
+        {
+          id: 'standard-5',
+          label: 'Standard · best of 5',
+          note: 'Advantage scoring · long format',
+          values: {
+            settingTennisPreset:'standard-5', settingTrackingMode:'simple',
+            settingTennisMatchType:'singles', settingTennisBestOf:'5',
+            settingTennisNoAd:'false', settingTennisDecider:'0'
+          }
+        },
+        {
+          id: 'no-ad-3',
+          label: 'No-Ad · best of 3',
+          note: 'Deciding point at 40–40',
+          values: {
+            settingTennisPreset:'no-ad-3', settingTrackingMode:'simple',
+            settingTennisMatchType:'singles', settingTennisBestOf:'3',
+            settingTennisNoAd:'true', settingTennisDecider:'0'
+          }
+        },
+        {
+          id: 'doubles-10',
+          label: 'Doubles · match tie-break 10',
+          note: 'No-Ad · 10-point deciding match tie-break',
+          values: {
+            settingTennisPreset:'doubles-10', settingTrackingMode:'simple',
+            settingTennisMatchType:'doubles', settingTennisBestOf:'3',
+            settingTennisNoAd:'true', settingTennisDecider:'10'
+          }
+        }
       ];
     case 'badminton':
       return [
