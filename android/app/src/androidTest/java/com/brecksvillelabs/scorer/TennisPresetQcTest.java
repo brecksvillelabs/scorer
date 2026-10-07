@@ -77,6 +77,7 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
             TeamFixture left = TEAMS[0], right = TEAMS[1];
             loadSavedTeamsIntoSetup(webView, SPORT, left, right);
             setPreset(webView, "standard-3", "simple", "singles", 3, false, 0);
+            showFormatForSetupScreenshot(webView, "standard-3", left, right);
             captureScreenshot(new File(artifactDir, "01-tennis-standard-3-setup.png")); screenshots++;
             startMatch(webView, SPORT, left, right);
             waitForPresetState(webView, "standard-3", 3, false, 0, "singles");
@@ -148,7 +149,7 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
             );
             point(webView, "A", 6);
             point(webView, "B", 6);
-            waitForHero(webView, left, right, "6", "6", 0, 0, "Doubles", false);
+            waitForHero(webView, left, right, "6", "6", 1, 1, "Doubles", false);
             waitForJsTrue(webView,
                 "(() => { const t=document.getElementById('gameSurface')?.textContent||''; return t.includes(" + q(left.roster[0]) + ") && t.includes(" + q(left.roster[1]) + ") && t.includes('MATCH TIE-BREAK'); })()",
                 5000,
@@ -228,6 +229,28 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
             assertTrue("Tennis QC CSV report was not written", reportFile.isFile() && reportFile.length() > 0);
             publishArtifact(reportFile, "tennis-reference");
         }
+    }
+
+    private void showFormatForSetupScreenshot(WebView webView, String preset,
+                                              TeamFixture left, TeamFixture right) throws Exception {
+        evaluate(webView,
+            "(() => {" +
+            " const modal=document.getElementById('setupModal');" +
+            " if(modal?.dataset?.v039Step==='teams') document.getElementById('v039NextBtn')?.click();" +
+            " return true; })()"
+        );
+        waitForJsTrue(webView,
+            "(() => {" +
+            " const modal=document.getElementById('setupModal');" +
+            " const card=document.querySelector('[data-v039-preset=" + preset + "]');" +
+            " const a=document.getElementById('inputNameA')?.value;" +
+            " const b=document.getElementById('inputNameB')?.value;" +
+            " return Boolean(modal?.dataset?.v039Step==='format' && card?.getAttribute('aria-pressed')==='true'" +
+            " && a===" + q(left.name) + " && b===" + q(right.name) + "); })()",
+            6000,
+            "Tennis Quick Start format screenshot " + preset
+        );
+        SystemClock.sleep(350);
     }
 
     private void setPreset(WebView webView, String preset, String tracking, String matchType,
