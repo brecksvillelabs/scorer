@@ -46,10 +46,10 @@ export const SPORT_RULE_PROFILES = {
     defaults: { bestOf: 3, tiebreakAt: 6, tiebreakTo: 7, winBy: 2 }
   },
   badminton: {
-    baseline: 'BWF-style rally scoring',
-    simple: ['points', 'games', 'server'],
-    advanced: ['service court', 'doubles serving order'],
-    defaults: { bestOf: 3, gameTo: 21, winBy: 2, cap: 30 }
+    baseline: 'Rally scoring with selectable BAI/BWF and short-format presets',
+    simple: ['points', 'games', 'server', 'preset'],
+    advanced: ['service court', 'singles/doubles context', 'manual server override'],
+    defaults: { preset: 'bai-3x21', bestOf: 3, gameTo: 21, winBy: 2, cap: 30, matchType: 'singles' }
   }
 };
 
@@ -142,7 +142,13 @@ export function createInitialState(options = {}) {
       setHistory: [], phase: 'live', matchWinner: null
     },
     badminton: {
-      bestOf: Number(options.badmintonBestOf || 3), gameTo: Number(options.badmintonGameTo || 21), points: { A: 0, B: 0 }, games: { A: 0, B: 0 },
+      preset: String(options.badmintonPreset || 'bai-3x21'),
+      bestOf: Math.max(1, Number(options.badmintonBestOf || 3)),
+      gameTo: Math.max(1, Number(options.badmintonGameTo || 21)),
+      winBy: Math.max(1, Number(options.badmintonWinBy || 2)),
+      cap: Math.max(1, Number(options.badmintonCap || 30)),
+      matchType: options.badmintonMatchType === 'doubles' ? 'doubles' : 'singles',
+      points: { A: 0, B: 0 }, games: { A: 0, B: 0 },
       servingTeam: options.servingTeam || 'A', gameHistory: [], phase: 'live', matchWinner: null
     },
     cricket: {
@@ -258,7 +264,15 @@ export function normalizeSportFoundationState(state) {
     next.basketball.shotClockRunning = Boolean(next.basketball.shotClockRunning);
   }
   if (next.tennis) next.tennis.phase ||= next.finished ? 'final' : 'live';
-  if (next.badminton) next.badminton.phase ||= next.finished ? 'final' : 'live';
+  if (next.badminton) {
+    next.badminton.phase ||= next.finished ? 'final' : 'live';
+    next.badminton.preset ||= 'bai-3x21';
+    next.badminton.bestOf = Math.max(1, Number(next.badminton.bestOf || 3));
+    next.badminton.gameTo = Math.max(1, Number(next.badminton.gameTo || 21));
+    next.badminton.winBy = Math.max(1, Number(next.badminton.winBy || 2));
+    next.badminton.cap = Math.max(next.badminton.gameTo, Number(next.badminton.cap || (next.badminton.gameTo <= 15 ? 21 : 30)));
+    next.badminton.matchType = next.badminton.matchType === 'doubles' ? 'doubles' : 'singles';
+  }
   return next;
 }
 
@@ -530,19 +544,35 @@ export function formatTennisPoint(state, side) {
 }
 
 export function badmintonPoint(state, side) {
-  const next = clone(state); if (next.finished) return next;
+  const next = normalizeSportFoundationState(state); if (next.finished || !['A','B'].includes(side)) return next;
   const b = next.badminton; const other = otherSide(side);
   if (b.phase === 'game_break') b.phase = 'live';
   b.points[side] += 1; b.servingTeam = side;
-  appendCoreEvent(next, 'badminton.rally', { side, pointA: b.points.A, pointB: b.points.B });
+  appendCoreEvent(next, 'badminton.rally', {
+    side, pointA: b.points.A, pointB: b.points.B,
+    game: next.period, preset: b.preset
+  });
   const p = b.points[side], op = b.points[other];
-  const won = (p >= b.gameTo && p - op >= 2) || p >= 30;
-  if (won) {
-    b.games[side] += 1; b.gameHistory.push({ game: b.gameHistory.length + 1, winner: side, scoreA: b.points.A, scoreB: b.points.B });
-    appendCoreEvent(next, 'badminton.game_won', { side, game: b.gameHistory.length, scoreA: b.points.A, scoreB: b.points.B });
+  const wonByMargin = p >= b.gameTo && p - op >= b.winBy;
+  const wonByCap = p >= b.cap;
+  if (wonByMargin || wonByCap) {
+    b.games[side] += 1;
+    b.gameHistory.push({
+      game: b.gameHistory.length + 1, winner: side,
+      scoreA: b.points.A, scoreB: b.points.B, preset: b.preset
+    });
+    appendCoreEvent(next, 'badminton.game_won', {
+      side, game: b.gameHistory.length, scoreA: b.points.A, scoreB: b.points.B,
+      preset: b.preset
+    });
     const needed = Math.ceil(b.bestOf / 2);
-    if (b.games[side] >= needed) { b.phase = 'final'; b.matchWinner = side; finish(next, side, 'badminton'); }
-    else { b.points = { A: 0, B: 0 }; b.phase = 'game_break'; next.period += 1; }
+    if (b.games[side] >= needed) {
+      b.phase = 'final'; b.matchWinner = side; finish(next, side, 'badminton');
+    } else {
+      b.points = { A: 0, B: 0 };
+      b.phase = 'game_break';
+      next.period += 1;
+    }
   }
   next.updatedAt = Date.now(); return next;
 }
