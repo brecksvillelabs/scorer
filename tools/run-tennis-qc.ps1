@@ -19,9 +19,9 @@ function Resolve-Adb {
 }
 
 
-function Test-Java21Home([string]$home) {
-    if ([string]::IsNullOrWhiteSpace($home)) { return $false }
-    $java = Join-Path $home "bin\java.exe"
+function Test-Java21Home([string]$javaHomePath) {
+    if ([string]::IsNullOrWhiteSpace($javaHomePath)) { return $false }
+    $java = Join-Path $javaHomePath "bin\java.exe"
     if (-not (Test-Path $java)) { return $false }
     $versionText = (& $java -version 2>&1 | Out-String)
     return $versionText -match '(?m)(java|openjdk) version "21([\.|"])'
@@ -33,8 +33,8 @@ function Resolve-Java21Home {
     $javaOnPath = Get-Command java -ErrorAction SilentlyContinue
     if ($javaOnPath) {
         $bin = Split-Path -Parent $javaOnPath.Source
-        $home = Split-Path -Parent $bin
-        if (Test-Java21Home $home) { return $home }
+        $javaHomeFromPath = Split-Path -Parent $bin
+        if (Test-Java21Home $javaHomeFromPath) { return $javaHomeFromPath }
     }
 
     $candidates = @(
