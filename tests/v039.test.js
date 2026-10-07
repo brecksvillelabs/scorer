@@ -46,6 +46,14 @@ test('lacrosse quick format keeps Field and Sixes distinct', () => {
   assert.equal(sixes.values.settingLacrosseShotClock, '30');
 });
 
+test('tennis Quick Start exposes Gold scoring presets', () => {
+  const presets = quickFormatPresets('tennis');
+  assert.deepEqual(presets.map(x => x.id), ['standard-3','standard-5','no-ad-3','doubles-10']);
+  assert.equal(presets[2].values.settingTennisNoAd, 'true');
+  assert.equal(presets[3].values.settingTennisMatchType, 'doubles');
+  assert.equal(presets[3].values.settingTennisDecider, '10');
+});
+
 test('racket sports use player/team terminology', () => {
   assert.equal(sportRoleCopy('tennis').sideA, 'Player / Team A');
   assert.equal(sportRoleCopy('badminton').nameB, 'Player / team name');
