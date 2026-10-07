@@ -140,7 +140,19 @@ function renderSportSettings() {
     <label>Format<select id="settingCricketFormat"><option value="T20">T20</option><option value="ODI">ODI</option><option value="Custom">Custom</option></select></label>
     <label>Overs per innings<input id="settingOvers" type="number" min="1" max="500" value="20"></label>
     <label>Batting first<select id="settingBatting"><option value="A">Side A</option><option value="B">Side B</option></select></label>`;
-  if (s === 'tennis') body += `<label>Match format<select id="settingTennisBestOf"><option value="3" selected>Best of 3 sets</option><option value="5">Best of 5 sets</option></select></label>`;
+  if (s === 'tennis') body += `
+    <label>Preset<select id="settingTennisPreset">
+      <option value="standard-3" selected>Standard · best of 3</option>
+      <option value="standard-5">Standard · best of 5</option>
+      <option value="no-ad-3">No-Ad · best of 3</option>
+      <option value="doubles-10">Doubles · match tie-break to 10</option>
+      <option value="custom">Custom</option>
+    </select></label>
+    <label>Scoring detail<select id="settingTrackingMode"><option value="simple" selected>Simple scorer</option><option value="advanced">Detailed service view</option></select></label>
+    <label>Match type<select id="settingTennisMatchType"><option value="singles" selected>Singles</option><option value="doubles">Doubles</option></select></label>
+    <label>Best of<select id="settingTennisBestOf"><option value="3" selected>3 sets</option><option value="5">5 sets</option></select></label>
+    <label>Game scoring<select id="settingTennisNoAd"><option value="false" selected>Advantage</option><option value="true">No-Ad</option></select></label>
+    <label>Deciding set<select id="settingTennisDecider"><option value="0" selected>Full tie-break set</option><option value="10">Match tie-break to 10</option><option value="7">Match tie-break to 7</option></select></label>`;
   if (s === 'badminton') body += `
     <label>Preset<select id="settingBadmintonPreset">
       <option value="bai-3x21" selected>BAI / BWF · best of 3 to 21</option>
@@ -166,6 +178,20 @@ function renderSportSettings() {
     const sixes = e.target.value === 'sixes';
     $('settingMinutes').value = sixes ? 8 : 15;
     $('settingLacrosseShotClock').value = sixes ? 30 : 0;
+  });
+  $('settingTennisPreset')?.addEventListener('change', e => {
+    const presets={
+      'standard-3':{bestOf:3,noAd:'false',decider:'0',matchType:'singles'},
+      'standard-5':{bestOf:5,noAd:'false',decider:'0',matchType:'singles'},
+      'no-ad-3':{bestOf:3,noAd:'true',decider:'0',matchType:'singles'},
+      'doubles-10':{bestOf:3,noAd:'true',decider:'10',matchType:'doubles'}
+    };
+    const p=presets[e.target.value];
+    if(!p)return;
+    $('settingTennisBestOf').value=String(p.bestOf);
+    $('settingTennisNoAd').value=p.noAd;
+    $('settingTennisDecider').value=p.decider;
+    $('settingTennisMatchType').value=p.matchType;
   });
   $('settingBadmintonPreset')?.addEventListener('change', e => {
     const presets={
@@ -216,7 +242,11 @@ function hydrateSetup() {
     if ($('settingCricketFormat')) $('settingCricketFormat').value = state.cricket.format;
     if ($('settingOvers')) $('settingOvers').value = state.cricket.oversLimit;
     if ($('settingBatting')) $('settingBatting').value = state.cricket.battingTeam;
-    if ($('settingTennisBestOf')) $('settingTennisBestOf').value = state.tennis.bestOf;
+    if ($('settingTennisPreset')) $('settingTennisPreset').value = state.tennis.preset || 'standard-3';
+    if ($('settingTennisBestOf')) $('settingTennisBestOf').value = String(state.tennis.bestOf || 3);
+    if ($('settingTennisNoAd')) $('settingTennisNoAd').value = state.tennis.noAd ? 'true' : 'false';
+    if ($('settingTennisDecider')) $('settingTennisDecider').value = String(state.tennis.decidingMatchTiebreakTo || 0);
+    if ($('settingTennisMatchType')) $('settingTennisMatchType').value = state.tennis.matchType || 'singles';
     if ($('settingBadmintonPreset')) $('settingBadmintonPreset').value = state.badminton.preset || 'bai-3x21';
     if ($('settingBadmintonBestOf')) $('settingBadmintonBestOf').value = state.badminton.bestOf;
     if ($('settingBadmintonGameTo')) $('settingBadmintonGameTo').value = state.badminton.gameTo;
@@ -240,7 +270,11 @@ function startFromSetup() {
     teamB:{ name:el.inputNameB.value.trim() || 'Away', color:el.inputColorB.value, logo:pendingLogos.B, roster:parseRosterText(el.inputRosterB.value) },
     bestOf:Number($('settingBestOf')?.value || 5), setTo:Number($('settingSetTo')?.value || 25), decidingSetTo:Number($('settingDecidingSetTo')?.value || 15), winBy:Number($('settingWinBy')?.value || 2),
     periodMinutes:Number($('settingMinutes')?.value || 10), cricketFormat:$('settingCricketFormat')?.value || 'T20', oversLimit:Number($('settingOvers')?.value || 20), battingTeam:$('settingBatting')?.value || 'A',
+    tennisPreset:$('settingTennisPreset')?.value || 'standard-3',
     tennisBestOf:Number($('settingTennisBestOf')?.value || 3),
+    tennisNoAd:$('settingTennisNoAd')?.value === 'true',
+    tennisDecidingMatchTiebreakTo:Number($('settingTennisDecider')?.value || 0),
+    tennisMatchType:$('settingTennisMatchType')?.value || 'singles',
     badmintonPreset:$('settingBadmintonPreset')?.value || 'bai-3x21',
     badmintonBestOf:Number($('settingBadmintonBestOf')?.value || 3),
     badmintonGameTo:Number($('settingBadmintonGameTo')?.value || 21),
@@ -257,7 +291,7 @@ function startFromSetup() {
     const n = clone(state); Object.assign(n.teamA, opts.teamA); Object.assign(n.teamB, opts.teamB);
     if (selectedSport === 'volleyball') Object.assign(n.volleyball,{bestOf:opts.bestOf,setTo:opts.setTo,decidingSetTo:opts.decidingSetTo,winBy:opts.winBy});
     if (['basketball','soccer','football','lacrosse','kabaddi'].includes(selectedSport)) { n.clock.periodSeconds = opts.periodMinutes * 60; n.clock.targetSeconds = opts.periodMinutes * 60; }
-    if (selectedSport === 'soccer' || selectedSport === 'basketball' || selectedSport === 'badminton') n.trackingMode = opts.trackingMode === 'advanced' ? 'advanced' : 'simple';
+    if (selectedSport === 'soccer' || selectedSport === 'basketball' || selectedSport === 'badminton' || selectedSport === 'tennis') n.trackingMode = opts.trackingMode === 'advanced' ? 'advanced' : 'simple';
     if (selectedSport === 'basketball' && n.basketball) {
       n.basketball.shotClockSeconds = Math.max(0, Number(opts.basketballShotClock ?? 24));
       n.basketball.shotClock = Math.min(n.basketball.shotClockSeconds, Number(n.basketball.shotClock || n.basketball.shotClockSeconds));
@@ -276,7 +310,13 @@ function startFromSetup() {
     }
     if (selectedSport === 'baseball') n.baseball.regulationInnings = opts.baseballInnings;
     if (selectedSport === 'cricket') { n.cricket.format=opts.cricketFormat; n.cricket.oversLimit=opts.oversLimit; }
-    if (selectedSport === 'tennis') n.tennis.bestOf=opts.tennisBestOf;
+    if (selectedSport === 'tennis') {
+      n.tennis.preset=opts.tennisPreset;
+      n.tennis.bestOf=opts.tennisBestOf;
+      n.tennis.noAd=Boolean(opts.tennisNoAd);
+      n.tennis.decidingMatchTiebreakTo=Math.max(0,Number(opts.tennisDecidingMatchTiebreakTo||0));
+      n.tennis.matchType=opts.tennisMatchType==='doubles'?'doubles':'singles';
+    }
     if (selectedSport === 'badminton') {
       n.badminton.preset=opts.badmintonPreset;
       n.badminton.bestOf=opts.badmintonBestOf;
@@ -521,13 +561,65 @@ function renderBaseball(){
   el.gameSurface.innerHTML=baseballBoardMarkup(state,{esc,safeColor,logoMarkup});
 }
 
+function tennisPresetLabel(t){
+  const labels={
+    'standard-3':'Standard · best of 3',
+    'standard-5':'Standard · best of 5',
+    'no-ad-3':'No-Ad · best of 3',
+    'doubles-10':'Doubles · match tie-break 10',
+    custom:'Custom'
+  };
+  return labels[t.preset] || 'Custom';
+}
 function renderTennis(){
   const t=state.tennis;
-  el.gameSurface.innerHTML=`<section class="racket-board"><div class="racket-head"><div><div class="racket-title">Match scoreboard</div><div class="racket-note">${t.tiebreak?'Tie-break in progress':`Best of ${t.bestOf} sets`}</div></div><div class="history-row">${t.setHistory.map(h=>`<span class="history-pill">${h.scoreA}-${h.scoreB}</span>`).join('')}</div></div>
-    <div class="racket-grid-head"><span>Player / team</span><span>Sets</span><span>Games</span><span>Point</span></div>
-    ${racketRow('A',t.sets.A,t.games.A,formatTennisPoint(state,'A'),t.servingTeam==='A')}${racketRow('B',t.sets.B,t.games.B,formatTennisPoint(state,'B'),t.servingTeam==='B')}
-    <div class="racket-controls"><button class="racket-score-btn a" data-action="tennis-point" data-side="A">Point · ${esc(state.teamA.name)}</button><button class="racket-score-btn b" data-action="tennis-point" data-side="B">Point · ${esc(state.teamB.name)}</button></div></section>`;
+  const detailed=state.trackingMode==='advanced';
+  const between=t.phase==='set_break';
+  const matchTb=Boolean(t.matchTiebreak);
+  const tb=Boolean(t.tiebreak);
+  const pointA=formatTennisPoint(state,'A');
+  const pointB=formatTennisPoint(state,'B');
+  const team=side=>{
+    const tm=state[teamKey(side)];
+    const logo=tm.logo?`<img src="${tm.logo}" alt="">`:esc((tm.name||'?')[0].toUpperCase());
+    const roster=(tm.roster||[]).slice(0,t.matchType==='doubles'?2:1).join(' / ');
+    const serving=!between&&!state.finished&&t.servingTeam===side;
+    return `<div class="tennis-hero-team" data-tennis-hero-team="${side}">
+      <div class="tennis-hero-logo team-logo">${logo}</div>
+      <div class="tennis-team-copy"><strong>${esc(tm.name)}</strong><small>${esc(roster || (t.matchType==='doubles'?'Doubles':'Singles'))}</small>${serving?'<span class="tennis-serving">● SERVING</span>':''}</div>
+      <div class="tennis-sets-won"><b>${t.sets[side]}</b><span>sets</span></div>
+    </div>`;
+  };
+  const history=t.setHistory.map((h,i)=>{
+    const suffix=h.matchTiebreak?` · MTB ${h.matchTiebreak}`:h.tiebreak?` · TB ${h.tiebreak}`:'';
+    return `<span class="tennis-history-pill">S${i+1} ${h.scoreA}–${h.scoreB}${suffix}</span>`;
+  }).join('');
+  const status=state.finished?'FINAL':matchTb?'MATCH TIE-BREAK':tb?'TIE-BREAK':between?`SET ${state.period} NEXT`:`SET ${state.period}`;
+  const scoring=t.noAd?'No-Ad':'Advantage';
+  const deciding=t.decidingMatchTiebreakTo>0?`decider TB ${t.decidingMatchTiebreakTo}`:'full deciding set';
+  const decidingPoint=t.noAd&&!tb&&!matchTb&&t.points.A>=3&&t.points.B>=3;
+  el.gameSurface.innerHTML=`<section class="tennis-board">
+    <header class="tennis-score-hero">
+      <div class="tennis-hero-top"><span class="tennis-status">${status}</span><strong>${esc(tennisPresetLabel(t))}</strong><small>${scoring} · ${deciding}</small></div>
+      <div class="tennis-matchup">
+        ${team('A')}
+        <div class="tennis-score-stack">
+          <div class="tennis-current-point" aria-label="${esc(state.teamA.name)} ${pointA} to ${pointB} ${esc(state.teamB.name)}"><b data-tennis-hero-point="A">${pointA}</b><span>–</span><b data-tennis-hero-point="B">${pointB}</b></div>
+          <div class="tennis-games"><span>Games</span><strong data-tennis-hero-games="A">${t.games.A}</strong><i>–</i><strong data-tennis-hero-games="B">${t.games.B}</strong></div>
+        </div>
+        ${team('B')}
+      </div>
+      ${history?`<div class="tennis-history">${history}</div>`:''}
+    </header>
+    ${decidingPoint?'<div class="tennis-deciding-banner">No-Ad deciding point — next point wins the game.</div>':''}
+    ${detailed?`<div class="tennis-detail-banner">${matchTb?'Match tie-break service rotates 1, then 2-and-2.':tb?'Tie-break service rotates 1, then 2-and-2.':'Detailed service view · use the server controls below only for corrections.'}</div>`:''}
+    <div class="tennis-point-grid">
+      <button class="tennis-point-btn a" data-action="tennis-point" data-side="A">+1 point <strong>${esc(state.teamA.name)}</strong></button>
+      <button class="tennis-point-btn b" data-action="tennis-point" data-side="B">+1 point <strong>${esc(state.teamB.name)}</strong></button>
+    </div>
+  </section>`;
 }
+
 function badmintonPresetLabel(b){
   const labels={
     'bai-3x21':'BAI / BWF · 3×21',
@@ -603,7 +695,12 @@ function renderTools(){
   const s=state.sport;
   if(s==='cricket'){ const c=state.cricket,batSide=c.battingTeam,fieldSide=otherSide(batSide),bat=state[teamKey(batSide)],field=state[teamKey(fieldSide)];
     el.sportTools.innerHTML=`<div class="tool-panel">${c.needsBowler?'<div class="bowler-alert">Over complete — select the next bowler before continuing.</div>':''}<div class="role-selects"><label>Striker<select data-role="striker">${options(bat.roster,c.striker)}</select></label><label>Non-striker<select data-role="nonStriker">${options(bat.roster,c.nonStriker)}</select></label><label>Bowler<select data-role="bowler">${options(field.roster,c.bowler)}</select></label></div><div class="tool-row"><button class="tool-btn" data-action="switch-innings">${c.innings===1?'Start 2nd innings':'Finish match'}</button></div></div>`; return; }
-  if(s==='tennis'){ const serving=state.tennis.servingTeam; el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn ${serving==='A'?'active':''}" data-action="set-server" data-side="A">${esc(state.teamA.name)} serves</button><button class="tool-btn ${serving==='B'?'active':''}" data-action="set-server" data-side="B">${esc(state.teamB.name)} serves</button></div></div>`; return; }
+  if(s==='tennis'){
+    if(state.trackingMode!=='advanced'){ el.sportTools.innerHTML=''; return; }
+    const serving=state.tennis.servingTeam;
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row"><button class="tool-btn ${serving==='A'?'active':''}" data-action="set-server" data-side="A">${esc(state.teamA.name)} serves</button><button class="tool-btn ${serving==='B'?'active':''}" data-action="set-server" data-side="B">${esc(state.teamB.name)} serves</button><span class="basketball-tools-note">Manual server correction only; games and tie-breaks rotate serve automatically.</span></div></div>`;
+    return;
+  }
   if(s==='badminton'){
     if(state.trackingMode!=='advanced'){ el.sportTools.innerHTML=''; return; }
     const serving=state.badminton.servingTeam;
