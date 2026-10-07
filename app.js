@@ -615,8 +615,10 @@ function renderTennis(){
       <div class="tennis-matchup">
         ${team('A')}
         <div class="tennis-score-stack">
-          <div class="tennis-current-point" aria-label="${esc(state.teamA.name)} ${pointA} to ${pointB} ${esc(state.teamB.name)}"><b data-tennis-hero-point="A">${pointA}</b><span>–</span><b data-tennis-hero-point="B">${pointB}</b></div>
-          <div class="tennis-games"><span>Games</span><strong data-tennis-hero-games="A">${t.games.A}</strong><i>–</i><strong data-tennis-hero-games="B">${t.games.B}</strong></div>
+          <div class="tennis-current-point" aria-label="${esc(state.teamA.name)} ${heroA} to ${heroB} ${esc(state.teamB.name)}"><b data-tennis-hero-point="A">${heroA}</b><span>–</span><b data-tennis-hero-point="B">${heroB}</b></div>
+          ${state.finished
+            ? `<div class="tennis-games tennis-final-score-label"><span>${heroLabel}</span></div>`
+            : `<div class="tennis-games"><span>${heroLabel}</span><strong data-tennis-hero-games="A">${t.games.A}</strong><i>–</i><strong data-tennis-hero-games="B">${t.games.B}</strong></div>`}
         </div>
         ${team('B')}
       </div>
