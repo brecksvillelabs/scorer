@@ -624,12 +624,12 @@ function renderTennis(){
       </div>
       ${history?`<div class="tennis-history">${history}</div>`:''}
     </header>
-    ${decidingPoint?'<div class="tennis-deciding-banner">No-Ad deciding point — next point wins the game.</div>':''}
-    ${detailed?`<div class="tennis-detail-banner">${matchTb?'Match tie-break service rotates 1, then 2-and-2.':tb?'Tie-break service rotates 1, then 2-and-2.':'Detailed service view · use the server controls below only for corrections.'}</div>`:''}
-    <div class="tennis-point-grid">
+    ${!state.finished&&decidingPoint?'<div class="tennis-deciding-banner">No-Ad deciding point — next point wins the game.</div>':''}
+    ${!state.finished&&detailed?`<div class="tennis-detail-banner">${matchTb?'Match tie-break service rotates 1, then 2-and-2.':tb?'Tie-break service rotates 1, then 2-and-2.':'Detailed service view · use the server controls below only for corrections.'}</div>`:''}
+    ${!state.finished?`<div class="tennis-point-grid">
       <button class="tennis-point-btn a" data-action="tennis-point" data-side="A">+1 point <strong>${esc(state.teamA.name)}</strong></button>
       <button class="tennis-point-btn b" data-action="tennis-point" data-side="B">+1 point <strong>${esc(state.teamB.name)}</strong></button>
-    </div>
+    </div>`:''}
   </section>`;
 }
 
