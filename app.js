@@ -48,7 +48,13 @@ const el = {
 function createStateFor(options) {
   return options?.sport === 'baseball' ? createBaseballState(options, createInitialState) : createScorerState(options, createInitialState);
 }
-function periodTextFor(value) { return value?.sport === 'baseball' ? getBaseballPeriodText(value) : getScorerPeriodText(value, getPeriodText); }
+function periodTextFor(value) {
+  if (value?.sport === 'tennis') {
+    if (value.finished) return 'Final';
+    if (value.tennis?.matchTiebreak) return 'Match TB';
+  }
+  return value?.sport === 'baseball' ? getBaseballPeriodText(value) : getScorerPeriodText(value, getPeriodText);
+}
 function swapAllSides(value) { return value?.sport === 'baseball' ? swapBaseballSides(value, swapSides) : swapScorerSides(value, swapSides); }
 
 function soccerMatchSeconds(value = state) {
@@ -625,7 +631,9 @@ function renderTennis(){
           <div class="tennis-current-point" aria-label="${esc(state.teamA.name)} ${heroA} to ${heroB} ${esc(state.teamB.name)}"><b data-tennis-hero-point="A">${heroA}</b><span>–</span><b data-tennis-hero-point="B">${heroB}</b></div>
           ${state.finished
             ? `<div class="tennis-games tennis-final-score-label"><span>${heroLabel}</span></div>`
-            : `<div class="tennis-games"><span>${heroLabel}</span><strong data-tennis-hero-games="A">${t.games.A}</strong><i>–</i><strong data-tennis-hero-games="B">${t.games.B}</strong></div>`}
+            : matchTb
+              ? `<div class="tennis-games"><span>SETS</span><strong data-tennis-hero-games="A">${t.sets.A}</strong><i>–</i><strong data-tennis-hero-games="B">${t.sets.B}</strong></div>`
+              : `<div class="tennis-games"><span>GAMES</span><strong data-tennis-hero-games="A">${t.games.A}</strong><i>–</i><strong data-tennis-hero-games="B">${t.games.B}</strong></div>`}
         </div>
         ${team('B')}
       </div>
