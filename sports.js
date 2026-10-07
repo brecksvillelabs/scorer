@@ -28,10 +28,10 @@ export const SPORT_RULE_PROFILES = {
     defaults: { periods: 2, periodMinutes: 45 }
   },
   football: {
-    baseline: 'Four-quarter gridiron football',
+    baseline: 'Four-quarter gridiron football with an optional connected drive layer',
     simple: ['score', 'quarter', 'clock'],
-    advanced: ['possession', 'down', 'distance', 'timeouts', 'overtime'],
-    defaults: { periods: 4, periodMinutes: 15 }
+    advanced: ['possession', 'down', 'distance', 'ball spot', 'yardage', 'timeouts', 'optional player attribution', 'web field snapshot', 'overtime'],
+    defaults: { periods: 4, periodMinutes: 15, ballSpot: 25, down: 1, distance: 10 }
   },
   cricket: {
     baseline: 'Limited-overs innings scoring',
@@ -63,7 +63,7 @@ export function teamKey(side) { return side === 'B' ? 'teamB' : 'teamA'; }
 export function otherSide(side) { return side === 'A' ? 'B' : 'A'; }
 
 function cleanRoster(roster) {
-  return Array.isArray(roster) ? [...new Set(roster.map(x => String(x || '').trim()).filter(Boolean))].slice(0, 40) : [];
+  return Array.isArray(roster) ? [...new Set(roster.map(x => String(x || '').trim()).filter(Boolean))].slice(0, 80) : [];
 }
 
 function makeMatchId() { return `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -135,7 +135,17 @@ export function createInitialState(options = {}) {
       shotClockRunning: false
     },
     soccer: { stoppage: 0, selectedPlayer: { A:'', B:'' } },
-    football: { down: 1, distance: 10, possession: 'A', timeouts: { A: 3, B: 3 } },
+    football: {
+      down: Math.min(4, Math.max(1, Number(options.footballDown || 1))),
+      distance: Math.max(1, Number(options.footballDistance || 10)),
+      possession: options.footballPossession === 'B' ? 'B' : 'A',
+      timeouts: { A: 3, B: 3 },
+      ballSpot: Math.min(100, Math.max(0, Number(options.footballBallSpot ?? 25))),
+      offenseDirection: Number(options.footballDirection) === -1 ? -1 : 1,
+      selectedPlayer: { A:'', B:'' },
+      lastPlay: null,
+      driveId: 1
+    },
     tennis: {
       preset: String(options.tennisPreset || 'standard-3'),
       bestOf: Math.max(1, Number(options.tennisBestOf || 3)),
@@ -273,6 +283,25 @@ export function normalizeSportFoundationState(state) {
     next.basketball.shotClock = Math.max(0, Number(next.basketball.shotClock ?? next.basketball.shotClockSeconds));
     next.basketball.shotClockRunning = Boolean(next.basketball.shotClockRunning);
   }
+  if (next.football) {
+    const f = next.football;
+    f.down = Math.min(4, Math.max(1, Number(f.down || 1)));
+    f.distance = Math.max(1, Number(f.distance || 10));
+    f.possession = f.possession === 'B' ? 'B' : 'A';
+    f.timeouts ||= { A:3, B:3 };
+    f.timeouts.A = Math.max(0, Number(f.timeouts.A ?? 3));
+    f.timeouts.B = Math.max(0, Number(f.timeouts.B ?? 3));
+    f.ballSpot = Math.min(100, Math.max(0, Number(f.ballSpot ?? 25)));
+    f.offenseDirection = Number(f.offenseDirection) === -1 ? -1 : 1;
+    f.selectedPlayer ||= { A:'', B:'' };
+    f.selectedPlayer.A ||= '';
+    f.selectedPlayer.B ||= '';
+    f.lastPlay ||= null;
+    f.driveId = Math.max(1, Number(f.driveId || 1));
+    for (const side of ['A','B']) {
+      next[teamKey(side)].roster = cleanRoster(next[teamKey(side)]?.roster || []);
+    }
+  }
   if (next.tennis) {
     const t = next.tennis;
     t.phase ||= next.finished ? 'final' : 'live';
@@ -297,6 +326,249 @@ export function normalizeSportFoundationState(state) {
     next.badminton.cap = Math.max(next.badminton.gameTo, Number(next.badminton.cap || (next.badminton.gameTo <= 15 ? 21 : 30)));
     next.badminton.matchType = next.badminton.matchType === 'doubles' ? 'doubles' : 'singles';
   }
+  return next;
+}
+
+function clampFootballSpot(value) {
+  return Math.min(100, Math.max(0, Number(value ?? 0)));
+}
+
+export function footballYardsToGoal(state) {
+  const f = state?.football;
+  if (!f) return 0;
+  return Math.max(0, f.offenseDirection === -1 ? Number(f.ballSpot || 0) : 100 - Number(f.ballSpot || 0));
+}
+
+export function footballSpotLabel(state, spot = state?.football?.ballSpot) {
+  const value = clampFootballSpot(spot);
+  if (value === 50) return '50';
+  if (value < 50) return `${state?.teamA?.name || 'A'} ${Math.round(value)}`;
+  return `${state?.teamB?.name || 'B'} ${Math.round(100 - value)}`;
+}
+
+export function footballSituationLabel(state) {
+  const f = state?.football;
+  if (!f) return '';
+  const ordinal = f.down === 1 ? '1st' : f.down === 2 ? '2nd' : f.down === 3 ? '3rd' : '4th';
+  const goal = footballYardsToGoal(state) <= Number(f.distance || 0);
+  return `${ordinal} & ${goal ? 'Goal' : Math.max(1, Number(f.distance || 1))}`;
+}
+
+export function footballFieldSnapshot(state) {
+  const f = state?.football;
+  if (!f) return null;
+  const yardsToGoal = footballYardsToGoal(state);
+  const lineToGainSpot = clampFootballSpot(
+    yardsToGoal <= Number(f.distance || 0)
+      ? (f.offenseDirection === -1 ? 0 : 100)
+      : Number(f.ballSpot || 0) + f.offenseDirection * Number(f.distance || 0)
+  );
+  return {
+    schemaVersion: 1,
+    matchId: state.matchId,
+    sport: 'football',
+    finished: Boolean(state.finished),
+    winner: state.winner || null,
+    period: Number(state.period || 1),
+    clockSeconds: Number(state.clock?.seconds || 0),
+    clockRunning: Boolean(state.clock?.running),
+    score: { A:Number(state.teamA?.score || 0), B:Number(state.teamB?.score || 0) },
+    teams: {
+      A: { name:state.teamA?.name || 'Home', color:state.teamA?.color || '#2563eb' },
+      B: { name:state.teamB?.name || 'Away', color:state.teamB?.color || '#e11d48' }
+    },
+    possession: f.possession,
+    down: Number(f.down || 1),
+    distance: Number(f.distance || 10),
+    situation: footballSituationLabel(state),
+    ballSpot: clampFootballSpot(f.ballSpot),
+    ballSpotLabel: footballSpotLabel(state),
+    offenseDirection: f.offenseDirection,
+    yardsToGoal,
+    goalToGo: yardsToGoal <= Number(f.distance || 0),
+    lineToGainSpot,
+    timeouts: { A:Number(f.timeouts?.A || 0), B:Number(f.timeouts?.B || 0) },
+    lastPlay: f.lastPlay || null
+  };
+}
+
+export function setFootballPossession(state, side, flipDirection = true) {
+  const next = clone(state);
+  if (next.sport !== 'football' || !['A','B'].includes(side)) return next;
+  const previous = next.football.possession;
+  if (previous !== side) {
+    next.football.possession = side;
+    if (flipDirection) next.football.offenseDirection *= -1;
+    next.football.down = 1;
+    next.football.distance = Math.max(1, Math.min(10, footballYardsToGoal(next)));
+    next.football.driveId = Math.max(1, Number(next.football.driveId || 1) + 1);
+  }
+  appendCoreEvent(next, 'football.possession', {
+    side,
+    previous,
+    ballSpot: next.football.ballSpot,
+    offenseDirection: next.football.offenseDirection,
+    driveId: next.football.driveId,
+    clockSeconds: next.clock?.seconds
+  });
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function setFootballSpot(state, spot) {
+  const next = clone(state);
+  if (next.sport !== 'football') return next;
+  const before = Number(next.football.ballSpot || 0);
+  next.football.ballSpot = clampFootballSpot(spot);
+  appendCoreEvent(next, 'football.ball_spot', {
+    from: before,
+    to: next.football.ballSpot,
+    label: footballSpotLabel(next),
+    clockSeconds: next.clock?.seconds
+  });
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function setFootballDirection(state, direction) {
+  const next = clone(state);
+  if (next.sport !== 'football') return next;
+  next.football.offenseDirection = Number(direction) === -1 ? -1 : 1;
+  appendCoreEvent(next, 'football.direction', {
+    direction: next.football.offenseDirection,
+    ballSpot: next.football.ballSpot,
+    clockSeconds: next.clock?.seconds
+  });
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function setFootballSituation(state, down, distance) {
+  const next = clone(state);
+  if (next.sport !== 'football') return next;
+  next.football.down = Math.min(4, Math.max(1, Number(down || 1)));
+  next.football.distance = Math.max(1, Number(distance || 1));
+  appendCoreEvent(next, 'football.situation', {
+    down: next.football.down,
+    distance: next.football.distance,
+    ballSpot: next.football.ballSpot,
+    clockSeconds: next.clock?.seconds
+  });
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function footballApplyPlay(state, yards = 0, player = '', playType = 'play') {
+  const next = clone(state);
+  if (next.sport !== 'football' || next.finished) return next;
+  const f = next.football;
+  const gain = Math.max(-99, Math.min(99, Math.trunc(Number(yards || 0))));
+  const beforeSpot = Number(f.ballSpot || 0);
+  const beforeDown = Number(f.down || 1);
+  const beforeDistance = Number(f.distance || 10);
+  const afterSpot = clampFootballSpot(beforeSpot + f.offenseDirection * gain);
+  f.ballSpot = afterSpot;
+
+  const reachedGoalLine = footballYardsToGoal(next) === 0;
+  const firstDown = !reachedGoalLine && gain >= beforeDistance;
+  let turnoverOnDowns = false;
+
+  if (reachedGoalLine) {
+    // Keep the live situation stable until the operator confirms the scoring result.
+  } else if (firstDown) {
+    f.down = 1;
+    f.distance = Math.max(1, Math.min(10, footballYardsToGoal(next)));
+  } else if (beforeDown < 4) {
+    f.down = beforeDown + 1;
+    f.distance = Math.max(1, beforeDistance - gain);
+  } else {
+    turnoverOnDowns = true;
+    f.possession = otherSide(f.possession);
+    f.offenseDirection *= -1;
+    f.driveId = Math.max(1, Number(f.driveId || 1) + 1);
+    f.down = 1;
+    f.distance = Math.max(1, Math.min(10, footballYardsToGoal(next)));
+  }
+
+  const cleanPlayer = String(player || '').trim();
+  f.lastPlay = {
+    type: String(playType || 'play'),
+    yards: gain,
+    player: cleanPlayer || null,
+    side: turnoverOnDowns ? otherSide(f.possession) : f.possession,
+    spotBefore: beforeSpot,
+    spotAfter: afterSpot,
+    firstDown,
+    turnoverOnDowns,
+    reachedGoalLine,
+    at: Date.now()
+  };
+
+  appendCoreEvent(next, 'football.play', {
+    side: f.lastPlay.side,
+    player: cleanPlayer || undefined,
+    playType: f.lastPlay.type,
+    yards: gain,
+    spotBefore: beforeSpot,
+    spotAfter: afterSpot,
+    firstDown,
+    turnoverOnDowns,
+    reachedGoalLine,
+    downBefore: beforeDown,
+    distanceBefore: beforeDistance,
+    downAfter: f.down,
+    distanceAfter: f.distance,
+    possession: f.possession,
+    clockSeconds: next.clock?.seconds
+  });
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function footballScore(state, side, points, scoringType = 'score', player = '') {
+  const next = clone(state);
+  if (next.sport !== 'football' || next.finished || !['A','B'].includes(side)) return next;
+  const amount = Number(points || 0);
+  const key = teamKey(side);
+  const before = Number(next[key].score || 0);
+  next[key].score = Math.max(0, before + amount);
+  const applied = next[key].score - before;
+  const cleanPlayer = String(player || '').trim();
+  if (applied !== 0) {
+    next.football.lastPlay = {
+      type: String(scoringType || 'score'),
+      points: applied,
+      player: cleanPlayer || null,
+      side,
+      ballSpot: next.football.ballSpot,
+      at: Date.now()
+    };
+    appendCoreEvent(next, applied > 0 ? 'football.score' : 'football.score_corrected', {
+      side,
+      points: applied,
+      delta: applied,
+      scoringType: String(scoringType || 'score'),
+      player: cleanPlayer || undefined,
+      scoreA: next.teamA.score,
+      scoreB: next.teamB.score,
+      ballSpot: next.football.ballSpot,
+      ballSpotLabel: footballSpotLabel(next),
+      clockSeconds: next.clock?.seconds
+    });
+  }
+  next.updatedAt = Date.now();
+  return next;
+}
+
+export function finishFootballMatch(state) {
+  const next = clone(state);
+  if (next.sport !== 'football' || next.finished) return next;
+  const a = Number(next.teamA.score || 0);
+  const b = Number(next.teamB.score || 0);
+  if (a === b) return next;
+  next.clock.running = false;
+  finish(next, a > b ? 'A' : 'B', 'football');
+  next.updatedAt = Date.now();
   return next;
 }
 
