@@ -119,7 +119,7 @@ try {
     }
 
     Write-Host ""
-    Write-Host "BADMINTON QC PASSED"
+    Write-Host "TENNIS QC PASSED"
 }
 finally {
     Pop-Location
