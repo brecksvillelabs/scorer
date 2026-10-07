@@ -21,11 +21,26 @@ function Resolve-Adb {
 
 function Test-Java21Home([string]$javaHomePath) {
     if ([string]::IsNullOrWhiteSpace($javaHomePath)) { return $false }
-    $java = Join-Path $javaHomePath "bin\java.exe"
-    if (-not (Test-Path $java)) { return $false }
-    $cmdLine = '""' + $java + '" -version 2>&1"'
-    $versionText = (& cmd.exe /d /c $cmdLine | Out-String)
-    return $versionText -match '(?m)(java|openjdk) version "21([\.|"])'
+    $javaExe = Join-Path $javaHomePath "bin\java.exe"
+    if (-not (Test-Path $javaExe)) { return $false }
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $javaExe
+    $psi.Arguments = "-version"
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    [void]$proc.Start()
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+
+    $versionText = $stdout + [Environment]::NewLine + $stderr
+    return $proc.ExitCode -eq 0 -and $versionText -match '(?m)(java|openjdk) version "21([\.|\"])'
 }
 
 function Resolve-Java21Home {
