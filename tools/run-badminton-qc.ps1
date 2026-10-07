@@ -18,7 +18,54 @@ function Resolve-Adb {
     throw "adb was not found. Install Android SDK Platform Tools or add platform-tools to PATH."
 }
 
+
+function Test-Java21Home([string]$home) {
+    if ([string]::IsNullOrWhiteSpace($home)) { return $false }
+    $java = Join-Path $home "bin\java.exe"
+    if (-not (Test-Path $java)) { return $false }
+    $versionText = (& $java -version 2>&1 | Out-String)
+    return $versionText -match '(?m)(java|openjdk) version "21([\.|"])'
+}
+
+function Resolve-Java21Home {
+    if (Test-Java21Home $env:JAVA_HOME) { return $env:JAVA_HOME }
+
+    $javaOnPath = Get-Command java -ErrorAction SilentlyContinue
+    if ($javaOnPath) {
+        $bin = Split-Path -Parent $javaOnPath.Source
+        $home = Split-Path -Parent $bin
+        if (Test-Java21Home $home) { return $home }
+    }
+
+    $candidates = @(
+        "C:\Program Files\Android\Android Studio\jbr"
+    )
+
+    $adoptiumRoots = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\Eclipse Adoptium"),
+        "C:\Program Files\Eclipse Adoptium"
+    )
+
+    foreach ($root in $adoptiumRoots) {
+        if (Test-Path $root) {
+            $candidates += Get-ChildItem $root -Directory -Filter "jdk-21*" -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending |
+                ForEach-Object { $_.FullName }
+        }
+    }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Java21Home $candidate) { return $candidate }
+    }
+
+    throw "Java 21 was not found. Install/use a JDK 21 or Android Studio JBR 21 before running Badminton QC."
+}
+
 $adb = Resolve-Adb
+$java21Home = Resolve-Java21Home
+$env:JAVA_HOME = $java21Home
+$env:Path = "$java21Home\bin;$env:Path"
+Write-Host "Using Java 21: $java21Home"
 
 Push-Location $repoRoot
 try {
