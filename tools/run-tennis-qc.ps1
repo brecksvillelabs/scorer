@@ -19,6 +19,44 @@ function Resolve-Adb {
 }
 
 
+function Resolve-AndroidSdk([string]$adbPath) {
+    $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_HOME)) { $candidates += $env:ANDROID_HOME }
+    if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_SDK_ROOT)) { $candidates += $env:ANDROID_SDK_ROOT }
+
+    if (-not [string]::IsNullOrWhiteSpace($adbPath)) {
+        $platformTools = Split-Path -Parent $adbPath
+        $sdkFromAdb = Split-Path -Parent $platformTools
+        if (-not [string]::IsNullOrWhiteSpace($sdkFromAdb)) { $candidates += $sdkFromAdb }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $candidates += (Join-Path $env:LOCALAPPDATA "Android\Sdk")
+    }
+
+    foreach ($candidate in ($candidates | Select-Object -Unique)) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        $adbCandidate = Join-Path $candidate "platform-tools\adb.exe"
+        if (Test-Path $adbCandidate) { return (Resolve-Path $candidate).Path }
+    }
+
+    throw "Android SDK was not found. Install the Android SDK or set ANDROID_HOME to the SDK directory."
+}
+
+function Ensure-AndroidLocalProperties([string]$sdkPath) {
+    $androidDir = Join-Path $repoRoot "android"
+    $localProperties = Join-Path $androidDir "local.properties"
+    $sdkForGradle = $sdkPath.Replace('\','/')
+    $sdkLine = "sdk.dir=$sdkForGradle"
+
+    $lines = @()
+    if (Test-Path $localProperties) {
+        $lines = @(Get-Content $localProperties | Where-Object { $_ -notmatch '^\s*sdk\.dir\s*=' })
+    }
+    $lines += $sdkLine
+    Set-Content -Path $localProperties -Value $lines -Encoding ASCII
+}
+
 function Test-Java21Home([string]$javaHomePath) {
     if ([string]::IsNullOrWhiteSpace($javaHomePath)) { return $false }
     $javaExe = Join-Path $javaHomePath "bin\java.exe"
@@ -78,6 +116,12 @@ function Resolve-Java21Home {
 }
 
 $adb = Resolve-Adb
+$androidSdk = Resolve-AndroidSdk $adb
+$env:ANDROID_HOME = $androidSdk
+$env:ANDROID_SDK_ROOT = $androidSdk
+Ensure-AndroidLocalProperties $androidSdk
+Write-Host "Using Android SDK: $androidSdk"
+
 $java21Home = Resolve-Java21Home
 $env:JAVA_HOME = $java21Home
 $env:Path = "$java21Home\bin;$env:Path"
