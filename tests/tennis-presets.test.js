@@ -65,6 +65,7 @@ test('standard tie-break remains first to 7 by two', () => {
 test('doubles preset replaces the deciding set with a 10-point match tie-break', () => {
   let state=make('doubles-10');
   state.tennis.sets.A=1;
+  state.period=2;
   state.tennis.games={A:0,B:5};
   state=points(state,'B',4);
   assert.equal(state.tennis.sets.B,1);
