@@ -90,8 +90,13 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
             playSet(webView, "B", "A", 6, 3);
             playTieBreakSet(webView, "A", "B", 8, 6);
             waitForFinal(webView, "standard-3", "A", 3, 2, 1);
+            waitForJsTrue(webView,
+                "(() => { const s=JSON.parse(localStorage.getItem('scorer-state-v2')||'null'); return s?.tennis?.setHistory?.at(-1)?.tiebreak==='8-6'; })()",
+                5000,
+                "Tennis deciding-set tie-break 8-6"
+            );
             openAndValidateFullScoreboard(webView, SPORT, left, right);
-            assertScorecard(webView, "Standard best of 3", "TB 8-6");
+            assertScorecard(webView, "Standard best of 3", "(6)");
             captureScreenshot(new File(artifactDir, "03-tennis-standard-tiebreak-final.png")); screenshots++;
             closeFullScoreboard(webView);
             reportGame(report, 1, "standard-3", left, right,
