@@ -90,6 +90,7 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
             playSet(webView, "B", "A", 6, 3);
             playTieBreakSet(webView, "A", "B", 8, 6);
             waitForFinal(webView, "standard-3", "A", 3, 2, 1);
+            waitForHero(webView, left, right, "7", "6", 7, 6, "Standard", true);
             waitForJsTrue(webView,
                 "(() => { const s=JSON.parse(localStorage.getItem('scorer-state-v2')||'null'); return s?.tennis?.setHistory?.at(-1)?.tiebreak==='8-6'; })()",
                 5000,
@@ -157,6 +158,7 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
             point(webView, "B", 2);
             point(webView, "A", 4);
             waitForFinal(webView, "doubles-10", "A", 3, 2, 1);
+            waitForHero(webView, left, right, "10", "8", 0, 0, "Doubles", true);
             openAndValidateFullScoreboard(webView, SPORT, left, right);
             assertScorecard(webView, "Doubles match tie-break 10", "MTB");
             captureScreenshot(new File(artifactDir, "07-tennis-doubles-match-tiebreak-final.png")); screenshots++;
@@ -176,7 +178,7 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
             playSet(webView, "A", "B", 6, 2);
             playSet(webView, "A", "B", 6, 0);
             waitForFinal(webView, "standard-5", "A", 3, 3, 0);
-            waitForHero(webView, left, right, "0", "0", 6, 0, "Standard", true);
+            waitForHero(webView, left, right, "6", "0", 6, 0, "Standard", true);
             captureScreenshot(new File(artifactDir, "08-tennis-standard-5-final.png")); screenshots++;
             reportGame(report, 4, "standard-5", left, right,
                 "best of 5; advantage scoring",
@@ -297,6 +299,14 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
     private void waitForHero(WebView webView, TeamFixture left, TeamFixture right,
                              String pointA, String pointB, int gamesA, int gamesB,
                              String presetText, boolean finished) throws Exception {
+        String scoreContext = finished
+            ? " && !h.querySelector('[data-tennis-hero-games=A]')" +
+              " && !h.querySelector('[data-tennis-hero-games=B]')" +
+              " && (text.includes('FINAL SET') || text.includes('MATCH TB'))" +
+              " && !document.querySelector('[data-action=tennis-point]')"
+            : " && ga?.textContent.trim()===" + q(String.valueOf(gamesA)) +
+              " && gb?.textContent.trim()===" + q(String.valueOf(gamesB));
+
         waitForJsTrue(webView,
             "(() => {" +
             " const h=document.querySelector('.tennis-score-hero'); if(!h)return false;" +
@@ -307,7 +317,7 @@ public class TennisPresetQcTest extends RoundRobinQcSupport {
             " return Boolean(getComputedStyle(h).display!=='none' && r.top>=0 && r.bottom<=window.innerHeight" +
             " && a?.textContent.includes(" + q(left.name) + ") && b?.textContent.includes(" + q(right.name) + ")" +
             " && pa?.textContent.trim()===" + q(pointA) + " && pb?.textContent.trim()===" + q(pointB) +
-            " && ga?.textContent.trim()===" + q(String.valueOf(gamesA)) + " && gb?.textContent.trim()===" + q(String.valueOf(gamesB)) +
+            scoreContext +
             " && text.includes(" + q(presetText) + ")" +
             " && " + (finished ? "text.includes('FINAL')" : "!text.includes('FINAL')") + "); })()",
             7000,
