@@ -602,8 +602,15 @@ function renderTennis(){
     </div>`;
   };
   const history=t.setHistory.map((h,i)=>{
-    const suffix=h.matchTiebreak?` · MTB ${h.matchTiebreak}`:h.tiebreak?` · TB ${h.tiebreak}`:'';
-    return `<span class="tennis-history-pill">S${i+1} ${h.scoreA}–${h.scoreB}${suffix}</span>`;
+    if(h.matchTiebreak){
+      return `<span class="tennis-history-pill">MTB ${esc(String(h.matchTiebreak).replace('-', '–'))}</span>`;
+    }
+    if(h.tiebreak){
+      const [tbA,tbB]=String(h.tiebreak).split('-');
+      const losingTb=Number(h.scoreA)<Number(h.scoreB)?tbA:tbB;
+      return `<span class="tennis-history-pill">S${i+1} ${h.scoreA}–${h.scoreB}(${esc(losingTb)})</span>`;
+    }
+    return `<span class="tennis-history-pill">S${i+1} ${h.scoreA}–${h.scoreB}</span>`;
   }).join('');
   const status=state.finished?'FINAL':matchTb?'MATCH TIE-BREAK':tb?'TIE-BREAK':between?`SET ${state.period} NEXT`:`SET ${state.period}`;
   const scoring=t.noAd?'No-Ad':'Advantage';
