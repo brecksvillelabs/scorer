@@ -579,6 +579,17 @@ function renderTennis(){
   const tb=Boolean(t.tiebreak);
   const pointA=formatTennisPoint(state,'A');
   const pointB=formatTennisPoint(state,'B');
+  const finalSet=state.finished?t.setHistory.at(-1):null;
+  const finalMatchTb=finalSet?.matchTiebreak?String(finalSet.matchTiebreak).split('-'):null;
+  const heroA=state.finished
+    ? (finalMatchTb?finalMatchTb[0]:String(finalSet?.scoreA ?? t.games.A))
+    : pointA;
+  const heroB=state.finished
+    ? (finalMatchTb?finalMatchTb[1]:String(finalSet?.scoreB ?? t.games.B))
+    : pointB;
+  const heroLabel=state.finished
+    ? (finalMatchTb?'MATCH TB':'FINAL SET')
+    : (matchTb?'MATCH TB':tb?'TIE-BREAK':'GAMES');
   const team=side=>{
     const tm=state[teamKey(side)];
     const logo=tm.logo?`<img src="${tm.logo}" alt="">`:esc((tm.name||'?')[0].toUpperCase());
