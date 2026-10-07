@@ -40,10 +40,10 @@ export const SPORT_RULE_PROFILES = {
     defaults: { format: 'T20', oversLimit: 20, wickets: 10 }
   },
   tennis: {
-    baseline: 'Traditional advantage-set scoring with 6-6 tie-break',
-    simple: ['points', 'games', 'sets', 'server'],
-    advanced: ['tie-break detail', 'doubles serving order', 'match tie-break'],
-    defaults: { bestOf: 3, tiebreakAt: 6, tiebreakTo: 7, winBy: 2 }
+    baseline: 'ITF-style tie-break sets with approved No-Ad and match tie-break alternatives',
+    simple: ['points', 'games', 'sets', 'server', 'preset'],
+    advanced: ['tie-break detail', 'doubles context', 'manual server correction', 'match tie-break'],
+    defaults: { preset: 'standard-3', bestOf: 3, noAd: false, tiebreakAt: 6, tiebreakTo: 7, tiebreakWinBy: 2, decidingMatchTiebreakTo: 0, matchType: 'singles' }
   },
   badminton: {
     baseline: 'Rally scoring with selectable BAI/BWF and short-format presets',
@@ -137,8 +137,18 @@ export function createInitialState(options = {}) {
     soccer: { stoppage: 0, selectedPlayer: { A:'', B:'' } },
     football: { down: 1, distance: 10, possession: 'A', timeouts: { A: 3, B: 3 } },
     tennis: {
-      bestOf: Number(options.tennisBestOf || 3), points: { A: 0, B: 0 }, games: { A: 0, B: 0 }, sets: { A: 0, B: 0 },
-      servingTeam: options.servingTeam || 'A', tiebreak: false, tiebreakPoints: { A: 0, B: 0 }, tiebreakStartServer: null,
+      preset: String(options.tennisPreset || 'standard-3'),
+      bestOf: Math.max(1, Number(options.tennisBestOf || 3)),
+      noAd: Boolean(options.tennisNoAd),
+      matchType: options.tennisMatchType === 'doubles' ? 'doubles' : 'singles',
+      tiebreakAt: Math.max(1, Number(options.tennisTiebreakAt || 6)),
+      tiebreakTo: Math.max(1, Number(options.tennisTiebreakTo || 7)),
+      tiebreakWinBy: Math.max(1, Number(options.tennisTiebreakWinBy || 2)),
+      decidingMatchTiebreakTo: Math.max(0, Number(options.tennisDecidingMatchTiebreakTo || 0)),
+      points: { A: 0, B: 0 }, games: { A: 0, B: 0 }, sets: { A: 0, B: 0 },
+      servingTeam: options.servingTeam || 'A',
+      tiebreak: false, tiebreakPoints: { A: 0, B: 0 }, tiebreakStartServer: null,
+      matchTiebreak: false, matchTiebreakPoints: { A: 0, B: 0 }, matchTiebreakStartServer: null,
       setHistory: [], phase: 'live', matchWinner: null
     },
     badminton: {
@@ -263,7 +273,21 @@ export function normalizeSportFoundationState(state) {
     next.basketball.shotClock = Math.max(0, Number(next.basketball.shotClock ?? next.basketball.shotClockSeconds));
     next.basketball.shotClockRunning = Boolean(next.basketball.shotClockRunning);
   }
-  if (next.tennis) next.tennis.phase ||= next.finished ? 'final' : 'live';
+  if (next.tennis) {
+    const t = next.tennis;
+    t.phase ||= next.finished ? 'final' : 'live';
+    t.preset ||= 'standard-3';
+    t.bestOf = Math.max(1, Number(t.bestOf || 3));
+    t.noAd = Boolean(t.noAd);
+    t.matchType = t.matchType === 'doubles' ? 'doubles' : 'singles';
+    t.tiebreakAt = Math.max(1, Number(t.tiebreakAt || 6));
+    t.tiebreakTo = Math.max(1, Number(t.tiebreakTo || 7));
+    t.tiebreakWinBy = Math.max(1, Number(t.tiebreakWinBy || 2));
+    t.decidingMatchTiebreakTo = Math.max(0, Number(t.decidingMatchTiebreakTo || 0));
+    t.matchTiebreak = Boolean(t.matchTiebreak);
+    t.matchTiebreakPoints ||= { A:0, B:0 };
+    t.matchTiebreakStartServer ||= null;
+  }
   if (next.badminton) {
     next.badminton.phase ||= next.finished ? 'final' : 'live';
     next.badminton.preset ||= 'bai-3x21';
@@ -481,47 +505,139 @@ export function volleyballPoint(state, side, delta = 1) {
 }
 
 export function tennisPoint(state, side) {
-  const next = clone(state); if (next.finished) return next;
-  const t = next.tennis; const other = otherSide(side);
+  const next = normalizeSportFoundationState(state);
+  if (next.finished || !['A','B'].includes(side)) return next;
+  const t = next.tennis;
+  const other = otherSide(side);
   if (t.phase === 'set_break') t.phase = 'live';
+
+  if (t.matchTiebreak) {
+    t.matchTiebreakPoints[side] += 1;
+    appendCoreEvent(next, 'tennis.match_tiebreak_point', {
+      side,
+      pointA: t.matchTiebreakPoints.A,
+      pointB: t.matchTiebreakPoints.B
+    });
+    const a = t.matchTiebreakPoints.A;
+    const b = t.matchTiebreakPoints.B;
+    const target = Math.max(1, Number(t.decidingMatchTiebreakTo || 10));
+    if (t.matchTiebreakPoints[side] >= target && Math.abs(a - b) >= 2) {
+      t.sets[side] += 1;
+      t.setHistory.push({
+        set: t.setHistory.length + 1,
+        winner: side,
+        scoreA: 0,
+        scoreB: 0,
+        matchTiebreak: `${a}-${b}`
+      });
+      appendCoreEvent(next, 'tennis.match_tiebreak_won', { side, pointA:a, pointB:b });
+      t.phase = 'final';
+      t.matchWinner = side;
+      finish(next, side, 'tennis');
+    } else {
+      const totalPlayed = a + b;
+      t.servingTeam = tiebreakServerForNextPoint(t.matchTiebreakStartServer, totalPlayed);
+    }
+    next.updatedAt = Date.now();
+    return next;
+  }
+
   if (t.tiebreak) {
     t.tiebreakPoints[side] += 1;
-    appendCoreEvent(next, 'tennis.point', { side, tiebreak: true, pointA: t.tiebreakPoints.A, pointB: t.tiebreakPoints.B });
-    const a = t.tiebreakPoints.A, b = t.tiebreakPoints.B;
-    if (t.tiebreakPoints[side] >= 7 && Math.abs(a - b) >= 2) {
-      t.games[side] = 7;
-      winTennisSet(next, side, { scoreA: t.games.A, scoreB: t.games.B, tiebreak: `${a}-${b}` });
+    appendCoreEvent(next, 'tennis.point', {
+      side,
+      tiebreak: true,
+      pointA: t.tiebreakPoints.A,
+      pointB: t.tiebreakPoints.B
+    });
+    const a = t.tiebreakPoints.A;
+    const b = t.tiebreakPoints.B;
+    if (t.tiebreakPoints[side] >= t.tiebreakTo && Math.abs(a - b) >= t.tiebreakWinBy) {
+      t.games[side] = t.tiebreakAt + 1;
+      winTennisSet(next, side, {
+        scoreA: t.games.A,
+        scoreB: t.games.B,
+        tiebreak: `${a}-${b}`
+      });
     } else {
       const totalPlayed = a + b;
       t.servingTeam = tiebreakServerForNextPoint(t.tiebreakStartServer, totalPlayed);
     }
-    next.updatedAt = Date.now(); return next;
+    next.updatedAt = Date.now();
+    return next;
   }
 
   t.points[side] += 1;
-  appendCoreEvent(next, 'tennis.point', { side, tiebreak: false, pointA: t.points.A, pointB: t.points.B });
-  const p = t.points[side], op = t.points[other];
-  if (p >= 4 && p - op >= 2) {
-    t.games[side] += 1; t.points = { A: 0, B: 0 }; t.servingTeam = otherSide(t.servingTeam);
-    const ga = t.games.A, gb = t.games.B;
-    if (ga === 6 && gb === 6) {
-      t.tiebreak = true; t.tiebreakPoints = { A: 0, B: 0 }; t.tiebreakStartServer = t.servingTeam;
-    } else if (t.games[side] >= 6 && Math.abs(ga - gb) >= 2) {
-      winTennisSet(next, side, { scoreA: ga, scoreB: gb });
+  appendCoreEvent(next, 'tennis.point', {
+    side,
+    tiebreak: false,
+    pointA: t.points.A,
+    pointB: t.points.B,
+    noAd: t.noAd
+  });
+
+  const p = t.points[side];
+  const op = t.points[other];
+  const gameWon = t.noAd
+    ? p >= 4 && op >= 3
+    : p >= 4 && p - op >= 2;
+
+  if (gameWon) {
+    t.games[side] += 1;
+    t.points = { A:0, B:0 };
+    t.servingTeam = otherSide(t.servingTeam);
+
+    const ga = t.games.A;
+    const gb = t.games.B;
+    if (ga === t.tiebreakAt && gb === t.tiebreakAt) {
+      t.tiebreak = true;
+      t.tiebreakPoints = { A:0, B:0 };
+      t.tiebreakStartServer = t.servingTeam;
+    } else if (t.games[side] >= t.tiebreakAt && Math.abs(ga - gb) >= 2) {
+      winTennisSet(next, side, { scoreA:ga, scoreB:gb });
     }
   }
-  next.updatedAt = Date.now(); return next;
+
+  next.updatedAt = Date.now();
+  return next;
 }
 
 function winTennisSet(next, side, result) {
   const t = next.tennis;
-  t.sets[side] += 1; t.setHistory.push({ set: t.setHistory.length + 1, winner: side, ...result });
+  t.sets[side] += 1;
+  t.setHistory.push({ set:t.setHistory.length + 1, winner:side, ...result });
   appendCoreEvent(next, 'tennis.set_won', { side, ...result });
+
   const needed = Math.ceil(t.bestOf / 2);
-  if (t.sets[side] >= needed) { t.phase = 'final'; t.matchWinner = side; finish(next, side, 'tennis'); return; }
-  if (t.tiebreak && t.tiebreakStartServer) t.servingTeam = otherSide(t.tiebreakStartServer);
-  t.points = { A: 0, B: 0 }; t.games = { A: 0, B: 0 }; t.tiebreak = false; t.tiebreakPoints = { A: 0, B: 0 }; t.tiebreakStartServer = null;
+  if (t.sets[side] >= needed) {
+    t.phase = 'final';
+    t.matchWinner = side;
+    finish(next, side, 'tennis');
+    return;
+  }
+
+  if (t.tiebreak && t.tiebreakStartServer) {
+    t.servingTeam = otherSide(t.tiebreakStartServer);
+  }
+
+  t.points = { A:0, B:0 };
+  t.games = { A:0, B:0 };
+  t.tiebreak = false;
+  t.tiebreakPoints = { A:0, B:0 };
+  t.tiebreakStartServer = null;
   next.period += 1;
+
+  const decidingTieBreak =
+    t.decidingMatchTiebreakTo > 0 &&
+    t.sets.A === needed - 1 &&
+    t.sets.B === needed - 1;
+
+  if (decidingTieBreak) {
+    t.matchTiebreak = true;
+    t.matchTiebreakPoints = { A:0, B:0 };
+    t.matchTiebreakStartServer = t.servingTeam;
+  }
+
   t.phase = 'set_break';
 }
 
@@ -533,14 +649,20 @@ function tiebreakServerForNextPoint(start, totalPlayed) {
 
 export function formatTennisPoint(state, side) {
   const t = state.tennis;
+  if (t.matchTiebreak) return String(t.matchTiebreakPoints[side]);
   if (t.tiebreak) return String(t.tiebreakPoints[side]);
-  const p = t.points[side], op = t.points[otherSide(side)];
+
+  const p = t.points[side];
+  const op = t.points[otherSide(side)];
+
+  if (t.noAd && p >= 3 && op >= 3) return '40';
+
   if (p >= 3 && op >= 3) {
     if (p === op) return '40';
     if (p === op + 1) return 'AD';
     if (p < op) return '40';
   }
-  return ['0', '15', '30', '40'][Math.min(p, 3)];
+  return ['0','15','30','40'][Math.min(p,3)];
 }
 
 export function badmintonPoint(state, side) {
