@@ -258,3 +258,82 @@ html[data-theme="light"] .tennis-point-btn{background:#fff}
   .tennis-point-grid{grid-template-columns:1fr}
   .tennis-point-btn{min-height:62px}
 }
+
+
+/* football gold */
+.football-board{display:grid;gap:14px}
+.football-score-hero{display:grid;gap:14px;padding:16px 18px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,rgba(18,35,29,.98),rgba(8,24,20,.98));box-shadow:var(--shadow)}
+.football-hero-meta{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px}
+.football-period{display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:0 11px;border-radius:999px;background:rgba(255,255,255,.07);font-size:.74rem;font-weight:950;letter-spacing:.08em}
+.football-game-clock{display:grid;justify-items:center;line-height:1}
+.football-game-clock span,.football-game-clock small{color:#9fb0a7;font-size:.62rem;font-weight:850;text-transform:uppercase;letter-spacing:.07em}
+.football-game-clock b{font-size:1.8rem;font-variant-numeric:tabular-nums;margin:3px 0}
+.football-situation{display:grid;justify-items:end}
+.football-situation span{font-size:.82rem;font-weight:950}
+.football-situation b{color:#b9ffbf;font-size:.72rem}
+.football-hero-matchup{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px}
+.football-hero-team{display:flex;align-items:center;gap:9px;min-width:0}
+.football-hero-team[data-football-hero-team="B"]{flex-direction:row-reverse;text-align:right}
+.football-hero-team strong{display:block;font-size:.9rem;line-height:1.1}
+.football-hero-team small{display:block;color:#9fb0a7;font-size:.67rem;font-weight:800;margin-top:3px}
+.football-hero-logo{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:#0a1713;border:1px solid var(--line);font-weight:950;flex:none}
+.football-hero-logo img{width:100%;height:100%;object-fit:cover}
+.football-hero-scoreline{display:flex;align-items:center;gap:10px;font-variant-numeric:tabular-nums}
+.football-hero-scoreline b{font-size:clamp(2.6rem,10vw,4.4rem);line-height:.9;letter-spacing:-.05em}
+.football-hero-scoreline span{font-size:1.25rem;color:#8fa49a;font-weight:900}
+.football-detail-banner{padding:10px 12px;border:1px solid rgba(34,211,238,.22);border-radius:14px;background:rgba(34,211,238,.06);color:#a5f3fc;font-size:.78rem;font-weight:800}
+.football-team-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.football-team-card{border:1px solid var(--line);border-radius:20px;padding:14px;background:rgba(13,32,25,.92)}
+.football-control-score{margin-left:auto;font-size:2.25rem;font-weight:950;line-height:1}
+.football-score-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.football-player-select{display:grid;gap:5px;margin-top:11px}
+.football-player-select span{font-size:.72rem;font-weight:850}
+.football-player-select small{color:#90a29a;font-weight:700}
+.football-player-select select{width:100%;min-height:42px}
+.football-drive-panel{display:grid;gap:12px;padding:14px;border:1px solid var(--line);border-radius:22px;background:rgba(9,27,21,.92)}
+.football-drive-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.football-drive-head span{display:block;color:#8fa49a;font-size:.62rem;font-weight:900;letter-spacing:.08em}
+.football-drive-head strong{display:block;font-size:1rem;margin-top:3px}
+.football-drive-direction{font-size:.74rem;font-weight:900;color:#b9ffbf;text-align:right}
+.football-field{display:grid;grid-template-columns:8% 84% 8%;min-height:145px;border:2px solid rgba(255,255,255,.28);border-radius:16px;overflow:hidden;background:#173b29}
+.football-endzone{display:grid;place-items:center;padding:5px;background:rgba(0,0,0,.2);font-size:.62rem;font-weight:950;writing-mode:vertical-rl;text-orientation:mixed;letter-spacing:.05em;text-transform:uppercase;overflow:hidden}
+.football-endzone.left{transform:rotate(180deg)}
+.football-field-grid{position:relative;background:
+  linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.07)),
+  repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),rgba(255,255,255,.28) calc(10% - 1px) 10%);
+}
+.football-field-grid:before,.football-field-grid:after{content:"";position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.22)}
+.football-field-grid:before{top:33%}.football-field-grid:after{bottom:33%}
+.football-field-grid>i{position:absolute;top:5px;bottom:5px;width:1px;background:rgba(255,255,255,.18);font-style:normal}
+.football-field-grid>i span{position:absolute;top:50%;left:5px;transform:translateY(-50%);color:rgba(255,255,255,.56);font-size:.58rem;font-weight:900}
+.football-first-down-line{position:absolute;top:0;bottom:0;width:3px;background:#facc15;transform:translateX(-50%);box-shadow:0 0 0 1px rgba(0,0,0,.22)}
+.football-ball-marker{position:absolute;top:50%;transform:translate(-50%,-50%);z-index:3}
+.football-ball-marker b{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#f97316;border:3px solid #fff;color:#4a2108;font-size:.7rem;box-shadow:0 4px 12px rgba(0,0,0,.35)}
+.football-field-caption{display:flex;gap:10px;flex-wrap:wrap;color:#92a59b;font-size:.68rem}
+.football-field-caption b{color:var(--text)}
+.football-drive-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.football-control-block{display:grid;gap:7px;padding:10px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+.football-control-block>span{font-size:.72rem;font-weight:900}
+.football-control-block>span small{display:block;color:#83968d;font-size:.62rem;font-weight:700;margin-top:2px}
+.football-control-block>div{display:flex;gap:6px;flex-wrap:wrap}
+.football-control-block input,.football-control-block select{min-height:40px;min-width:72px;flex:1}
+.football-control-block button{min-height:40px;border:1px solid var(--line);border-radius:10px;background:#132b22;color:var(--text);font-weight:850;padding:0 10px}
+.football-control-block button.primary,.football-control-block button.active{background:#154e3a;border-color:#2c8d68}
+.football-play-entry{grid-column:1/-1}
+.football-last-play{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.035);font-size:.72rem}
+.football-last-play span{color:#8ea097;font-weight:800}.football-last-play strong{text-align:right}
+html[data-theme="light"] .football-team-card,html[data-theme="light"] .football-drive-panel{background:#fff}
+@media(max-width:680px){
+  .football-score-hero{padding:14px}
+  .football-hero-meta{grid-template-columns:auto 1fr}
+  .football-situation{grid-column:1/-1;justify-items:center}
+  .football-hero-matchup{gap:7px}
+  .football-hero-logo{width:34px;height:34px}
+  .football-hero-scoreline b{font-size:2.55rem}
+  .football-team-grid{grid-template-columns:1fr}
+  .football-score-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .football-drive-head{align-items:flex-start}
+  .football-field{grid-template-columns:10% 80% 10%;min-height:125px}
+  .football-drive-controls{grid-template-columns:1fr}
+  .football-play-entry{grid-column:auto}
+}

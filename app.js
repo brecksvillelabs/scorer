@@ -1,6 +1,8 @@
 import {
   SPORT_DEFS, createInitialState, clone, applySimpleScore,
   basketballScore, basketballFoul, setBasketballPossession, basketballShotClockAction, finishBasketballMatch,
+  footballScore, footballApplyPlay, setFootballPossession, setFootballSpot, setFootballDirection, setFootballSituation,
+  footballFieldSnapshot, footballSituationLabel, footballSpotLabel, finishFootballMatch,
   soccerGoal, soccerCard, finishSoccerMatch,
   volleyballPoint, tennisPoint, formatTennisPoint,
   badmintonPoint, cricketAction, setCricketRole, switchCricketInnings, advancePeriod, tickClock, swapSides,
@@ -53,6 +55,10 @@ function periodTextFor(value) {
     if (value.finished) return 'Final';
     if (value.tennis?.matchTiebreak) return 'Match TB';
   }
+  if (value?.sport === 'football') {
+    if (value.finished) return 'Final';
+    if (Number(value.period || 1) > 4) return `OT${Number(value.period) - 4}`;
+  }
   return value?.sport === 'baseball' ? getBaseballPeriodText(value) : getScorerPeriodText(value, getPeriodText);
 }
 function swapAllSides(value) { return value?.sport === 'baseball' ? swapBaseballSides(value, swapSides) : swapScorerSides(value, swapSides); }
@@ -96,6 +102,7 @@ function bindEvents() {
   el.gameSurface.addEventListener('click', handleActionClick); el.sportTools.addEventListener('click', handleActionClick);
   el.gameSurface.addEventListener('change', handleSoccerPlayerChange);
   el.gameSurface.addEventListener('change', handleBasketballPlayerChange);
+  el.gameSurface.addEventListener('change', handleFootballPlayerChange);
   el.sportTools.addEventListener('change', handleRoleChange);
   document.addEventListener('scorer:prepare-scheduled-game', event => prepareScheduledGame(event.detail || {}));
   document.addEventListener('keydown', e => {
@@ -131,6 +138,7 @@ function renderSportSettings() {
     const mins = s === 'basketball' ? 10 : s === 'soccer' ? 45 : 15;
     body += `<label>Period length (minutes)<input id="settingMinutes" type="number" min="1" max="90" value="${mins}"></label>`;
     if (s === 'soccer' || s === 'basketball') body += `<label>Scoring detail<select id="settingTrackingMode"><option value="simple" selected>Simple scorer</option><option value="advanced">Detailed · optional players</option></select></label>`;
+    if (s === 'football') body += `<label>Scoring detail<select id="settingTrackingMode"><option value="simple" selected>Basic scorer · no extras</option><option value="advanced">Detailed field + players · connected-ready</option></select></label>`;
     if (s === 'basketball') body += `<label>Shot clock <select id="settingBasketballShotClock"><option value="24" selected>24 seconds</option><option value="30">30 seconds</option><option value="0">Off</option></select></label>`;
   }
   if (s === 'lacrosse') body += `
@@ -176,6 +184,7 @@ function renderSportSettings() {
   const note = s === 'lacrosse' ? 'Field and Sixes use different timing. Shot-clock use is configurable so youth/domestic rules can match the competition.' :
     s === 'kabaddi' ? 'Quick Score keeps raid ownership and the raid clock prominent. Touch/bonus points can accumulate before the raid is ended.' :
     s === 'baseball' ? 'Quick Score tracks inning, R-H-E, count, outs and base occupancy. Runner advancement stays manual except for forced movement on a walk/HBP.' :
+    s === 'football' ? 'Basic scorer stays fast and account-free. Detailed mode adds roster attribution, yardage, down-and-distance and an editable field position built to feed a future signed-in live webpage.' :
     'Roster fields accept one name per line or pasted CSV names. Cricket uses those rosters for active batters and bowlers; racket sports can use player or doubles-pair names.';
   body += `<div class="setting-note">${note}</div></div>`;
   el.sportSettings.innerHTML = body;
@@ -297,7 +306,7 @@ function startFromSetup() {
     const n = clone(state); Object.assign(n.teamA, opts.teamA); Object.assign(n.teamB, opts.teamB);
     if (selectedSport === 'volleyball') Object.assign(n.volleyball,{bestOf:opts.bestOf,setTo:opts.setTo,decidingSetTo:opts.decidingSetTo,winBy:opts.winBy});
     if (['basketball','soccer','football','lacrosse','kabaddi'].includes(selectedSport)) { n.clock.periodSeconds = opts.periodMinutes * 60; n.clock.targetSeconds = opts.periodMinutes * 60; }
-    if (selectedSport === 'soccer' || selectedSport === 'basketball' || selectedSport === 'badminton' || selectedSport === 'tennis') n.trackingMode = opts.trackingMode === 'advanced' ? 'advanced' : 'simple';
+    if (selectedSport === 'soccer' || selectedSport === 'basketball' || selectedSport === 'football' || selectedSport === 'badminton' || selectedSport === 'tennis') n.trackingMode = opts.trackingMode === 'advanced' ? 'advanced' : 'simple';
     if (selectedSport === 'basketball' && n.basketball) {
       n.basketball.shotClockSeconds = Math.max(0, Number(opts.basketballShotClock ?? 24));
       n.basketball.shotClock = Math.min(n.basketball.shotClockSeconds, Number(n.basketball.shotClock || n.basketball.shotClockSeconds));
@@ -342,7 +351,7 @@ function startFromSetup() {
 function render() {
   if (!state) return; const def=SPORTS[state.sport];
   el.sportPill.textContent=`${def.icon} ${def.name}`; el.periodText.textContent=periodTextFor(state); el.clockBtn.classList.toggle('hidden',!def.hasClock); el.clockBtn.textContent=state.sport==='soccer'?soccerClockText(state):formatClock(state.clock.seconds);
-  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else if (state.sport==='lacrosse') renderLacrosse(); else if (state.sport==='kabaddi') renderKabaddi(); else if (state.sport==='baseball') renderBaseball(); else if (state.sport==='soccer') renderSoccer(); else if (state.sport==='basketball') renderBasketball(); else renderTeamSport();
+  if (state.sport==='cricket') renderCricket(); else if (state.sport==='tennis') renderTennis(); else if (state.sport==='badminton') renderBadminton(); else if (state.sport==='lacrosse') renderLacrosse(); else if (state.sport==='kabaddi') renderKabaddi(); else if (state.sport==='baseball') renderBaseball(); else if (state.sport==='soccer') renderSoccer(); else if (state.sport==='basketball') renderBasketball(); else if (state.sport==='football') renderFootball(); else renderTeamSport();
   renderTools(); el.undoBtn.disabled=history.length===0; el.saveStatus.textContent='Saved';
   if (!el.fullScoreboardModal.classList.contains('hidden')) renderFullScoreboard();
 }
@@ -377,6 +386,84 @@ async function shareCurrentScore(){
     const result=await shareContent({title:scoreShareTitle(state),text,dialogTitle:'Share score update'});
     if (!result.shared) { await copyText(text); toast('Score update copied — paste it into a message'); }
   } catch(error) { if(error?.name!=='AbortError') toast('Could not share the score update'); }
+}
+
+function renderFootball() {
+  const f=state.football;
+  const detailed=state.trackingMode==='advanced';
+  const snapshot=footballFieldSnapshot(state);
+  const period=state.period<=4?`Q${state.period}`:`OT${state.period-4}`;
+  const heroTeam=side=>{
+    const t=state[teamKey(side)];
+    const logo=t.logo?`<img src="${t.logo}" alt="">`:esc((t.name||'?')[0].toUpperCase());
+    const detail=detailed?`<small>${f.timeouts[side]} TO${f.possession===side?' · ● ball':''}</small>`:'';
+    return `<div class="football-hero-team" data-football-hero-team="${side}">
+      <div class="football-hero-logo">${logo}</div>
+      <div><strong>${esc(t.name)}</strong>${detail}</div>
+    </div>`;
+  };
+  const playerSelect=side=>{
+    if(!detailed||state.finished)return'';
+    const t=state[teamKey(side)];
+    const selected=f.selectedPlayer?.[side]||'';
+    const roster=(t.roster||[]).map(name=>`<option value="${attr(name)}" ${name===selected?'selected':''}>${esc(name)}</option>`).join('');
+    return `<label class="football-player-select"><span>Player <small>optional attribution</small></span><select data-football-player="${side}"><option value="">Team only / no player</option>${roster}</select></label>`;
+  };
+  const scoreButtons=side=>{
+    if(state.finished)return'';
+    const t=state[teamKey(side)];
+    const defs=[
+      ['TD +6',6,'touchdown',true],
+      ['FG +3',3,'field-goal',true],
+      ['PAT +1',1,'pat',false],
+      ['2PT +2',2,'two-point',false],
+      ['Safety +2',2,'safety',false],
+      ['−1',-1,'correction',false]
+    ];
+    return defs.map(([label,points,type,primary])=>`<button class="score-btn ${primary?'primary':''}" style="--team-color:${safeColor(t.color)}" data-action="football-score" data-side="${side}" data-points="${points}" data-score-type="${type}">${label}</button>`).join('');
+  };
+  const team=side=>{
+    const t=state[teamKey(side)];
+    const logo=t.logo?`<img src="${t.logo}" alt="">`:esc((t.name||'?')[0].toUpperCase());
+    return `<article class="football-team-card" style="--team-color:${safeColor(t.color)}">
+      <div class="team-head"><div class="team-logo">${logo}</div><div style="min-width:0"><div class="team-name">${esc(t.name)}</div><div class="team-sub">${detailed?(f.possession===side?'Possession':'Defense'):'Quick scoring'}</div></div><div class="football-control-score">${t.score}</div></div>
+      ${playerSelect(side)}
+      <div class="football-score-actions">${scoreButtons(side)}</div>
+    </article>`;
+  };
+  const yardMarks=[10,20,30,40,50,60,70,80,90].map(x=>`<i style="left:${x}%"><span>${x===50?'50':x<50?x:100-x}</span></i>`).join('');
+  const field=detailed?`<section class="football-drive-panel">
+    <div class="football-drive-head">
+      <div><span>LIVE FIELD STATE</span><strong>${esc(footballSituationLabel(state))} · ${esc(footballSpotLabel(state))}</strong></div>
+      <div class="football-drive-direction">${f.offenseDirection===1?'→':'←'} ${esc(state[teamKey(f.possession)].name)} driving</div>
+    </div>
+    <div class="football-field" data-football-field>
+      <div class="football-endzone left">${esc(state.teamA.name)}</div>
+      <div class="football-field-grid">${yardMarks}
+        <div class="football-first-down-line" style="left:${snapshot.lineToGainSpot}%"></div>
+        <div class="football-ball-marker" style="left:${snapshot.ballSpot}%" title="${esc(snapshot.ballSpotLabel)}"><b>●</b></div>
+      </div>
+      <div class="football-endzone right">${esc(state.teamB.name)}</div>
+    </div>
+    <div class="football-field-caption"><span>Ball: <b>${esc(snapshot.ballSpotLabel)}</b></span><span>Line to gain: <b>${esc(footballSpotLabel(state,snapshot.lineToGainSpot))}</b></span><span>To goal: <b>${snapshot.yardsToGoal} yd</b></span></div>
+    ${!state.finished?`<div class="football-drive-controls">
+      <div class="football-control-block"><span>Ball position <small>0 = ${esc(state.teamA.name)} goal · 100 = ${esc(state.teamB.name)} goal</small></span><div><input id="footballSpotInput" type="number" min="0" max="100" value="${snapshot.ballSpot}"><button data-action="football-set-spot">Set spot</button><button data-action="football-spot-delta" data-delta="-5">−5</button><button data-action="football-spot-delta" data-delta="5">+5</button></div></div>
+      <div class="football-control-block"><span>Down & distance</span><div><select id="footballDownInput"><option value="1" ${f.down===1?'selected':''}>1st</option><option value="2" ${f.down===2?'selected':''}>2nd</option><option value="3" ${f.down===3?'selected':''}>3rd</option><option value="4" ${f.down===4?'selected':''}>4th</option></select><input id="footballDistanceInput" type="number" min="1" max="99" value="${f.distance}"><button data-action="football-set-situation">Set</button></div></div>
+      <div class="football-control-block football-play-entry"><span>Log play yardage <small>positive = offense gains yards</small></span><div><input id="footballYardsInput" type="number" min="-99" max="99" value="0"><select id="footballPlayType"><option value="run">Run</option><option value="pass">Pass</option><option value="penalty">Penalty / adjustment</option><option value="play">Other play</option></select><button class="primary" data-action="football-play">Apply play</button></div></div>
+      <div class="football-control-block"><span>Possession / direction</span><div><button class="${f.possession==='A'?'active':''}" data-action="football-possession" data-side="A">${esc(state.teamA.name)} ball</button><button class="${f.possession==='B'?'active':''}" data-action="football-possession" data-side="B">${esc(state.teamB.name)} ball</button><button data-action="football-direction">Flip direction</button></div></div>
+    </div>`:''}
+    ${f.lastPlay?`<div class="football-last-play"><span>Last update</span><strong>${esc(f.lastPlay.type||'play')}${Number.isFinite(Number(f.lastPlay.yards))?` · ${Number(f.lastPlay.yards)>=0?'+':''}${f.lastPlay.yards} yd`:''}${f.lastPlay.player?` · ${esc(f.lastPlay.player)}`:''}</strong></div>`:''}
+  </section>`:'';
+
+  el.gameSurface.innerHTML=`<section class="football-board">
+    <header class="football-score-hero">
+      <div class="football-hero-meta"><span class="football-period">${state.finished?'FINAL':period}</span><div class="football-game-clock"><span>GAME</span><b>${formatClock(state.clock.seconds)}</b><small>${state.finished?'Final':state.clock.running?'Running':'Paused'}</small></div>${detailed?`<div class="football-situation"><span>${esc(footballSituationLabel(state))}</span><b>${esc(snapshot.ballSpotLabel)}</b></div>`:''}</div>
+      <div class="football-hero-matchup">${heroTeam('A')}<div class="football-hero-scoreline"><b data-football-hero-score="A">${state.teamA.score}</b><span>–</span><b data-football-hero-score="B">${state.teamB.score}</b></div>${heroTeam('B')}</div>
+    </header>
+    ${detailed&&!state.finished?'<div class="football-detail-banner">Detailed field mode · yardage, player attribution and field position are optional. This state is structured for future signed-in live web publishing.</div>':''}
+    ${field}
+    <div class="football-team-grid">${team('A')}${team('B')}</div>
+  </section>`;
 }
 
 function renderBasketball() {
@@ -760,6 +847,20 @@ function renderTools(){
     el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row">${previous}${periodAction}${shot}<span class="basketball-tools-note">Use Undo for any mistaken score, foul or timeout.</span></div></div>`;
     return;
   }
+  if(s==='football'){
+    const tied=Number(state.teamA.score||0)===Number(state.teamB.score||0);
+    const periodAction=state.finished
+      ? '<span class="basketball-final-chip">Game finished</span>'
+      : state.period<4
+        ? '<button class="tool-btn primary-tool" data-action="period" data-delta="1">Next Quarter</button>'
+        : tied
+          ? '<button class="tool-btn primary-tool" data-action="period" data-delta="1">Start Overtime</button>'
+          : '<button class="tool-btn primary-tool" data-action="football-finish">Finish Game</button>';
+    const previous=state.period>1&&!state.finished?'<button class="tool-btn" data-action="period" data-delta="-1">Previous Period</button>':'';
+    const detail=state.trackingMode==='advanced'&&!state.finished?timeoutTools():'';
+    el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row">${previous}${periodAction}${detail}<span class="basketball-tools-note">Basic scoring works without the field layer. Use Undo for any mistaken update.</span></div></div>`;
+    return;
+  }
   if(s==='soccer'){
     const previous = state.period === 2 && !state.finished ? '<button class="tool-btn" data-action="period" data-delta="-1">Previous Half</button>' : '';
     const phase = state.finished
@@ -775,7 +876,10 @@ function renderTools(){
   if(s==='volleyball') extras=timeoutTools();
   if(s==='basketball') extras=sideTools('Foul +','foul','basketball')+timeoutTools()+possessionTools('basketball');
   if(s==='soccer') extras=sideTools('Yellow','yellow','soccer')+sideTools('Red','red','soccer');
-  if(s==='football') extras=`<button class="tool-btn" data-action="down" data-delta="-1">Down −</button><button class="tool-btn" data-action="down" data-delta="1">Down +</button><button class="tool-btn" data-action="distance" data-delta="-5">Distance −5</button><button class="tool-btn" data-action="distance" data-delta="5">Distance +5</button>${possessionTools('football')}${timeoutTools()}`;
+  if(s==='football') {
+    const finish=!state.finished&&state.period>=4&&state.teamA.score!==state.teamB.score?'<button class="tool-btn primary-tool" data-action="football-finish">Finish game</button>':'';
+    extras=state.trackingMode==='advanced'?`${timeoutTools()}${finish}`:finish;
+  }
   el.sportTools.innerHTML=`<div class="tool-panel"><div class="tool-row">${periodBtns}${extras}</div></div>`;
 }
 function sideTools(label,action){return `<button class="tool-btn" data-action="${action}" data-side="A">${label} · A</button><button class="tool-btn" data-action="${action}" data-side="B">${label} · B</button>`;}
@@ -800,6 +904,14 @@ function handleActionClick(e){
   else if(action==='basketball-possession') n=setBasketballPossession(state,side);
   else if(action==='basketball-shot') n=basketballShotClockAction(state,b.dataset.value);
   else if(action==='basketball-finish') n=finishBasketballMatch(state);
+  else if(action==='football-score') n=footballScore(state,side,Number(b.dataset.points||0),b.dataset.scoreType||'score',state.football?.selectedPlayer?.[side]||'');
+  else if(action==='football-possession') n=setFootballPossession(state,side,true);
+  else if(action==='football-set-spot') n=setFootballSpot(state,Number($('footballSpotInput')?.value ?? state.football.ballSpot));
+  else if(action==='football-spot-delta') n=setFootballSpot(state,Number(state.football.ballSpot||0)+delta);
+  else if(action==='football-set-situation') n=setFootballSituation(state,Number($('footballDownInput')?.value||1),Number($('footballDistanceInput')?.value||10));
+  else if(action==='football-play') n=footballApplyPlay(state,Number($('footballYardsInput')?.value||0),state.football?.selectedPlayer?.[state.football.possession]||'',$('footballPlayType')?.value||'play');
+  else if(action==='football-direction') n=setFootballDirection(state,state.football.offenseDirection===1?-1:1);
+  else if(action==='football-finish') n=finishFootballMatch(state);
   else if(action==='soccer-goal') n=soccerGoal(state,side,delta,state.soccer?.selectedPlayer?.[side]||'');
   else if(action==='soccer-card') n=soccerCard(state,side,b.dataset.value,1,state.soccer?.selectedPlayer?.[side]||'');
   else if(action==='soccer-finish') n=finishSoccerMatch(state);
@@ -841,6 +953,14 @@ function mutateUtility(n,action,side,delta){
   if(action==='distance') n.football.distance=Math.max(1,n.football.distance+delta);
   if(action==='set-server'){ if(n.sport==='tennis')n.tennis.servingTeam=side;if(n.sport==='badminton')n.badminton.servingTeam=side; }
   n.updatedAt=Date.now();
+}
+function handleFootballPlayerChange(e){
+  const side=e.target?.dataset?.footballPlayer;
+  if(!side||state?.sport!=='football'||!['A','B'].includes(side))return;
+  const n=clone(state);
+  n.football.selectedPlayer ||= {A:'',B:''};
+  n.football.selectedPlayer[side]=e.target.value||'';
+  state=n;save(false);render();
 }
 function handleBasketballPlayerChange(e){
   const side=e.target?.dataset?.basketballPlayer;
@@ -903,7 +1023,7 @@ async function requestWake(){try{if('wakeLock'in navigator)wakeLock=await naviga
 function loadLogo(e,side){const file=e.target.files?.[0];if(!file)return;if(file.size>1.8*1024*1024){toast('Use a logo under 1.8 MB');e.target.value='';return;}const r=new FileReader();r.onload=()=>{pendingLogos[side]=String(r.result);renderLogoPreview(side);};r.readAsDataURL(file);}
 function renderLogoPreview(side){const host=side==='A'?el.logoPreviewA:el.logoPreviewB;const name=(side==='A'?el.inputNameA:el.inputNameB).value||`Side ${side}`;host.innerHTML=pendingLogos[side]?`<img src="${pendingLogos[side]}" alt=""><span>${esc(name)} logo</span>`:`<span>No logo — ${esc(name[0]||side)} will be shown</span>`;}
 function importRoster(e,side){const file=e.target.files?.[0];if(!file)return;const r=new FileReader();r.onload=()=>{const list=parseRosterText(String(r.result||''));$(side==='A'?'inputRosterA':'inputRosterB').value=list.join('\n');toast(`${list.length} names imported`);};r.readAsText(file);}
-function parseRosterText(text){return [...new Set(String(text||'').split(/[\r\n,;]+/).map(x=>x.trim().replace(/^"|"$/g,'')).filter(Boolean))].slice(0,40);}
+function parseRosterText(text){return [...new Set(String(text||'').split(/[\r\n,;]+/).map(x=>x.trim().replace(/^"|"$/g,'')).filter(Boolean))].slice(0,80);}
 
 function winnerText(){if(state.winner==='tie')return'Match tied';return `${esc(state[teamKey(state.winner)].name)} wins`;}
 function actionLabel(action,side){const name=side?state[teamKey(side)]?.name:'';return side?`${name}: ${action.replaceAll('-',' ')}`:action.replaceAll('-',' ');}
