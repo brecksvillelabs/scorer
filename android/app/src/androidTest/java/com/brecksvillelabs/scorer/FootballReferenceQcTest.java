@@ -376,9 +376,9 @@ public class FootballReferenceQcTest extends RoundRobinQcSupport {
     private void advanceToQuarter(WebView webView, int target) throws Exception {
         while (true) {
             String current = evaluate(webView,
-                "String(JSON.parse(localStorage.getItem('scorer-state-v2')||'null')?.period||0)"
+                "(() => JSON.parse(localStorage.getItem('scorer-state-v2')||'null')?.period || 0)()"
             );
-            int value = Integer.parseInt(current);
+            int value = Integer.parseInt(current.replace("\"", "").trim());
             if (value >= target) return;
             nextQuarter(webView, value + 1);
         }
